@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Authors: 
+# Authors:
 #   - Robert Morgan (robert.morgan@wisc.edu)
 #   - Jackson O'Donnell (jacksonhodonnell@gmail.com)
 #   - Jimena Gonzalez (sgonzalezloz@wisc.edu)
@@ -24,7 +24,7 @@ class CutoutProducer:
         self.tilename = tilename
         self.cutout_size = cutout_size
         self.read_metadata()
-    
+
     def read_metadata(self):
         """
         Read the metadata for the tile into a Pandas DataFrame
@@ -32,41 +32,41 @@ class CutoutProducer:
         filename = self.metadata_path + self.tilename + self.metadata_suffix
         if not os.path.exists(filename):
             raise IOError(f"{self.tilename} is not a valid tilename")
-            
+
         self.metadata = pd.read_csv(filename, delim_whitespace=True)
         return
-    
+
     def get_tile_filename(self, band):
         """
         construct the filepath to the coadd tile
-        
+
         :param band: (str) one of ('g', 'r', 'i', 'z', 'Y')
         :return: path: (str) absolute path to tile
         """
         raise NotImplementedError("Someone needs to do this")
-        
-    
+
+
     def read_tile_image(self, band):
         """
         Open a fits file and return the image array and the WCS
-        
+
         :param band: (str) one of ('g', 'r', 'i', 'z', 'Y')
         :return: image: (np.Array) the image data contained in the file
         :return: wcs: (astropy.WCS) the wcs for the file
         """
         tile_filename = self.get_tile_filename(band)
-        
+
         f = fits.open(tile_filename, mode='readonly')
         image = f[1].data
         wcs = WCS(f[1].header)
         f.close()
         return image, wcs
-    
-    
+
+
     def get_locations(self):
         """
         Store the coordintaes of each galaxy
-        
+
         :return: ras: (np.Array) all RA values of objects in the tile
         :return: decs: (np.Array) all DEC values of objects in the tile
         """
@@ -74,41 +74,43 @@ class CutoutProducer:
             self.read_metadata()
 
         return self.metadata['RA'].values, self.metadata['DEC'].values
-        
+
     def get_coadd_ids(self):
         """
         Get an array of all coadd object ids
         """
         if not hasattr(self, "metadata"):
             self.read_metadata()
-            
+
         self.coadd_ids = np.array(self.metadata['COADD_OBJECT_ID'].values, dtype=int)
         return
-        
+
     def cutout_objects(self, image, wcs):
         """
         Grab square arrays from image using the wcs
-        
+
         :param image: (np.Array) the image data contained in the file
         :param wcs: (astropy.WCS) the wcs for the file
         """
         ras, decs = self.get_locations()
-        pixel_locs = wcs.world_to_pixel(SkyCoord(ras, decs, unit='deg'))
-        object_x, object_y = pixel_locs[0].round().astype(int), pixel_locs[1].round().astype(int)
-        
+
+        # Get pixel of each location, rounding
+        pixel_x, pixel_y = wcs.world_to_pixel(SkyCoord(ras, decs, unit='deg'))
+        object_x, object_y = pixel_x.round().astype(int), pixel_y.round().astype(int)
+
         # Shout if any object is outside of tile
         if not np.all((0 < object_x) & (object_x < image.shape[0])
                     & (0 < object_y) & (object_y < image.shape[1])):
             raise ValueError('Some objects centered out of tile')
-        
+
         # FIXME: If an object is too close to a tile edge, single_cutout will
         # return a misshapen cutout, and this will through an error
         cutouts = np.empty((len(ras), self.cutout_size, self.cutout_size), dtype=np.double)
         for i, (x, y) in enumerate(zip(object_x, object_y)):
             cutouts[i] = single_cutout(image, (x, y), width)
         return cutouts
-    
-    def single_cutout(image, center, width):
+
+    def single_cutout(self, image, center):
         """
         Creates a single cutout from an image.
 
@@ -119,6 +121,7 @@ class CutoutProducer:
         :return: 2D Numpy array, shape = (width, width)
         """
         x, y = center
+        width = self.cutout_size
         if (width % 2) == 0:
             return image[x - width//2 : x + width//2,
                          y - width//2 : y + width//2]
@@ -128,23 +131,23 @@ class CutoutProducer:
     def combine_bands(self, bands=('g', 'r', 'i', 'z')):
         """
         Get cutouts from all bands and stack into one array
-        
-        :return: image_array: (np.Array) shape = (number of cutouts, number of bands, 
+
+        :return: image_array: (np.Array) shape = (number of cutouts, number of bands,
                                                   cutout_size, cutout_size)
         """
         if not hasattr(self, "coadd_ids"):
             self.get_coadd_ids()
-            
+
         image_array = np.empty((len(self.coadd_ids), len(bands), self.cutout_size, self.cutout_size), dtype=np.double)
-        
+
         raise NotImplementedError("Someone needs to do this")
         return image_array
-    
+
     def produce_cutout_file(self, image_array, out_dir=''):
         """
         Organize cutout data into an output file
 
-        :param image_array: (np.array) contains all images. Has 
+        :param image_array: (np.array) contains all images. Has
                             shape = (len(coadd_ids), 4, 65, 65)
                              - 4 bands = g,r,i,z
                              - 65 x 65 = image height x width
@@ -155,7 +158,7 @@ class CutoutProducer:
         """
         if not hasattr(self, "coadd_ids"):
             self.get_coadd_ids()
-            
+
         # Make the ID HDU
         col = fits.Column(name='COADD_ID', format='int16', array=self.coadd_ids)
         cols = fits.ColDefs([col])
@@ -170,12 +173,12 @@ class CutoutProducer:
             out_dir += '/'
         hdu_list.writeto(f'{out_dir}{self.tilename}.fits', overwrite=True)
 
-        
+
 if __name__ == "__main__":
     assert len(sys.argv) == 2, "Tilename must be given as a a command-line argument"
     tilename = sys.argv[1]
     CUTOUT_SIZE = 45
-    
+
     cutout_prod = CutoutProducer(tilename, CUTOUT_SIZE)
-    
+
     raise NotImplementedError("Someone needs to do this")
