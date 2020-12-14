@@ -18,12 +18,35 @@ import pandas as pd
 # also TODO: PSFs
 
 class CutoutProducer:
+    """
+    Class to produce cutouts of all objects on a specified DES tile. 
+    
+    Based on the provided tilename, the CutoutProducer locates and reads a 
+    compressed text file (referred to as metadata) specific to the tile. The 
+    metadata contains the object COADD_OBJECT_ID, RA, and DEC (among other 
+    properties) in a tabular format.
+    
+    The objects in the tile are then located using the FITS header of the 
+    DES tile file and the RA, DEC of each object.
+    
+    Image cutouts of the same size in each band are then stored in an array
+    of size (num_objects, num_bands, cutout_size, cutout_size) and saved to a
+    FITS file.
+    
+    """
     def __init__(self, tilename, cutout_size):
+        """
+        Initialize a CutoutProducer.
+        
+        :param tilename: (str) name of DES tile; something like 'DES0536-5457'
+        :param cutout_size: (int) side length in pixels of desired cutouts
+        """
         self.metadata_path = "/data/des81.b/data/stronglens/Y6_CUTOUT_METADATA/"
         self.metadata_suffix = ".tab.gz"
         self.tilename = tilename
         self.cutout_size = cutout_size
         self.read_metadata()
+        return
 
     def read_metadata(self):
         """
@@ -172,6 +195,7 @@ class CutoutProducer:
         if not out_dir.endswith('/') and out_dir != '':
             out_dir += '/'
         hdu_list.writeto(f'{out_dir}{self.tilename}.fits', overwrite=True)
+        return
 
 
 if __name__ == "__main__":
