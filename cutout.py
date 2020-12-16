@@ -44,7 +44,7 @@ class CutoutProducer:
         :param tilename: (str) name of DES tile; something like 'DES0536-5457'
         :param cutout_size: (int) side length in pixels of desired cutouts
         """
-        self.metadata_path = metadata_dir
+        self.metadata_path = metadata_path
         self.coadds_path = coadds_path 
         self.metadata_suffix = ".tab.gz"
         self.tilename = tilename
@@ -71,8 +71,8 @@ class CutoutProducer:
         :return: path: (str) absolute path to tile
         """
 
-        guess = os.path.join(self.coadds_path,
-                             f'DES{self.tilename}_r*_{band}.fits.fz')
+        guess = os.path.join(self.coadds_path, self.tilename,
+                             f'{self.tilename}_r*_{band}.fits.fz')
 
         matches = glob.glob(guess)
 
@@ -219,5 +219,9 @@ if __name__ == "__main__":
     CUTOUT_SIZE = 45
 
     cutout_prod = CutoutProducer(tilename, CUTOUT_SIZE)
+
+    for band in 'grizY':
+        path = cutout_prod.get_tile_filename(band)
+        assert os.path.exists(path)
 
     raise NotImplementedError("Someone needs to do this")
