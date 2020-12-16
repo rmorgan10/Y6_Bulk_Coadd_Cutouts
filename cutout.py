@@ -5,6 +5,7 @@
 #   - Jackson O'Donnell (jacksonhodonnell@gmail.com)
 #   - Jimena Gonzalez (sgonzalezloz@wisc.edu)
 
+import glob
 import os
 import sys
 
@@ -34,14 +35,17 @@ class CutoutProducer:
     FITS file.
 
     """
-    def __init__(self, tilename, cutout_size):
+    def __init__(self, tilename, cutout_size,
+                 metadata_path='/data/des81.b/data/stronglens/Y6_CUTOUT_METADATA/',
+                 coadds_path='/data/des40.b/data/des/y6a2/coadd/image'):
         """
         Initialize a CutoutProducer.
 
         :param tilename: (str) name of DES tile; something like 'DES0536-5457'
         :param cutout_size: (int) side length in pixels of desired cutouts
         """
-        self.metadata_path = "/data/des81.b/data/stronglens/Y6_CUTOUT_METADATA/"
+        self.metadata_path = metadata_dir
+        self.coadds_path = coadds_path 
         self.metadata_suffix = ".tab.gz"
         self.tilename = tilename
         self.cutout_size = cutout_size
@@ -67,12 +71,17 @@ class CutoutProducer:
         :return: path: (str) absolute path to tile
         """
 
-        # FIXME: this is a placeholder for testing
-        # It will only work with the example tile 0536-5457
-        path = '/data/des81.b/data/stronglens/TEST_TILES/' + \
-               'DES{tile}_coadds/DES{tile}_r5135p01_{band}.fits.fz'
+        guess = os.path.join(self.coadds_path,
+                             f'DES{self.tilename}_r*_{band}.fits.fz')
 
-        return path.format(tile=self.tilename, band=band)
+        matches = glob.glob(guess)
+
+        if len(matches) > 1:
+            return ValueError('error - more than one possible coadd')
+        elif not matches:
+            raise ValueError('no images found')
+
+        return matches[0]
 
 
     def read_tile_image(self, band):
