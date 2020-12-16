@@ -19,25 +19,25 @@ import pandas as pd
 
 class CutoutProducer:
     """
-    Class to produce cutouts of all objects on a specified DES tile. 
-    
-    Based on the provided tilename, the CutoutProducer locates and reads a 
-    compressed text file (referred to as metadata) specific to the tile. The 
-    metadata contains the object COADD_OBJECT_ID, RA, and DEC (among other 
+    Class to produce cutouts of all objects on a specified DES tile.
+
+    Based on the provided tilename, the CutoutProducer locates and reads a
+    compressed text file (referred to as metadata) specific to the tile. The
+    metadata contains the object COADD_OBJECT_ID, RA, and DEC (among other
     properties) in a tabular format.
-    
-    The objects in the tile are then located using the FITS header of the 
+
+    The objects in the tile are then located using the FITS header of the
     DES tile file and the RA, DEC of each object.
-    
+
     Image cutouts of the same size in each band are then stored in an array
     of size (num_objects, num_bands, cutout_size, cutout_size) and saved to a
     FITS file.
-    
+
     """
     def __init__(self, tilename, cutout_size):
         """
         Initialize a CutoutProducer.
-        
+
         :param tilename: (str) name of DES tile; something like 'DES0536-5457'
         :param cutout_size: (int) side length in pixels of desired cutouts
         """
@@ -66,7 +66,13 @@ class CutoutProducer:
         :param band: (str) one of ('g', 'r', 'i', 'z', 'Y')
         :return: path: (str) absolute path to tile
         """
-        raise NotImplementedError("Someone needs to do this")
+
+        # FIXME: this is a placeholder for testing
+        # It will only work with the example tile 0536-5457
+        path = '/data/des81.b/data/stronglens/TEST_TILES/' + \
+               'DES{tile}_coadds/DES{tile}_r5135p01_{band}.fits.fz'
+
+        return path.format(tile=self.tilename, band=band)
 
 
     def read_tile_image(self, band):
