@@ -34,14 +34,15 @@ class CutoutProducer:
     FITS file.
     
     """
-    def __init__(self, tilename, cutout_size):
+    def __init__(self, tilename, cutout_size, path="/data/des81.b/data/stronglens/Y6_CUTOUT_METADATA/"):
         """
         Initialize a CutoutProducer.
         
         :param tilename: (str) name of DES tile; something like 'DES0536-5457'
         :param cutout_size: (int) side length in pixels of desired cutouts
+        :param path: (str) relative metadata file path to location of script or absolute path
         """
-        self.metadata_path = "/data/des81.b/data/stronglens/Y6_CUTOUT_METADATA/"
+        self.metadata_path = path
         self.metadata_suffix = ".tab.gz"
         self.tilename = tilename
         self.cutout_size = cutout_size
