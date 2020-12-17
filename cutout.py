@@ -45,6 +45,7 @@ class CutoutProducer:
     
     def __init__(self, tilename, cutout_size, psf_cutout_size,
                  metadata_path='/data/des81.b/data/stronglens/Y6_CUTOUT_METADATA/',
+<<<<<<< HEAD
                  coadds_path='/data/des40.b/data/des/y6a2/coadd/image'):
 <<<<<<< HEAD
 =======
@@ -52,6 +53,10 @@ class CutoutProducer:
 >>>>>>> make path a default arg
 =======
 >>>>>>> fast forward cutout.py
+=======
+                 coadds_path='/data/des40.b/data/des/y6a2/coadd/image/',
+                 psf_path='/data/des40.b/data/des/y6a2/coadd/image/'):
+>>>>>>> add psf_path to init
         """
         Initialize a CutoutProducer.
 
@@ -62,6 +67,7 @@ class CutoutProducer:
         :param psf_cutout_size: (int) side length in pixels of desired PSF cutouts
         """
         self.metadata_path = metadata_path
+<<<<<<< HEAD
         self.coadds_path = coadds_path 
 =======
         :param path: (str) relative metadata file path to location of script or absolute path
@@ -74,6 +80,10 @@ class CutoutProducer:
         self.metadata_path = metadata_path
         self.coadds_path = coadds_path 
 >>>>>>> fast forward cutout.py
+=======
+        self.coadds_path = coadds_path
+        self.psf_path = psf_path
+>>>>>>> add psf_path to init
         self.metadata_suffix = ".tab.gz"
         self.tilename = tilename
         self.cutout_size = cutout_size
