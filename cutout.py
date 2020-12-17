@@ -39,23 +39,27 @@ class CutoutProducer:
 
     """
     
-    def __init__(self, tilename, cutout_size, psf_cutout_size,
+    def __init__(self, tilename, cutout_size, psf_cutout_size, bands="griz",
                  metadata_path='/data/des81.b/data/stronglens/Y6_CUTOUT_METADATA/',
-                 coadds_path='/data/des40.b/data/des/y6a2/coadd/image'):
+                 coadds_path='/data/des40.b/data/des/y6a2/coadd/image/',
+                 psf_path='/data/des40.b/data/des/y6a2/coadd/image/'):
+
         """
         Initialize a CutoutProducer.
 
         :param tilename: (str) name of DES tile; something like 'DES0536-5457'
         :param cutout_size: (int) side length in pixels of desired cutouts
         :param psf_cutout_size: (int) side length in pixels of desired PSF cutouts
+        :param bands: (str) bands to include; something like "griz" or "grizY"
         """
         self.metadata_path = metadata_path
         self.coadds_path = coadds_path 
+        self.psf_path = psf_path
         self.metadata_suffix = ".tab.gz"
         self.tilename = tilename
         self.cutout_size = cutout_size
         self.psf_cutout_size = psf_cutout_size
-        self.read_metadata()
+        self.bands = bands
         return
 
     def read_metadata(self):
@@ -160,11 +164,8 @@ class CutoutProducer:
         :param image: (np.Array) the image data contained in the file
         :param wcs: (astropy.WCS) the wcs for the file
         """
-        ras, decs = self.get_locations()
-
-        # Get pixel of each location, rounding
-        pixel_x, pixel_y = wcs.world_to_pixel(SkyCoord(ras, decs, unit='deg'))
-        object_x, object_y = pixel_x.round().astype(int), pixel_y.round().astype(int)
+        # Get index locations of all objects
+        object_x, object_y = self.get_object_xy(wcs)
 
         # Shout if any object is outside of tile
         if not np.all((0 < object_x) & (object_x < image.shape[0])
@@ -199,32 +200,40 @@ class CutoutProducer:
         return image[x - width//2 : x + width//2 + 1,
                      y - width//2 : y + width//2 + 1]
 
-    def cutout_psfs(self, wcs):
+    def read_psf(self, band):
         """
-        Grab square PSF cutout images
+        Read a psf into memory
 
-        :param wcs: (astropy.WCS) the wcs for the tile
-        :param cutout_size: (int) 
-
-        :return: 3D Numpy array
+        :param band: (str) band to target
+        :return: a DES_PSFEx instance
         """
         filename = self.get_tile_psf_filename(self, band)
         psf = DES_PSFEx(filename)
-        
+        return psf
+    
+    def cutout_psfs(self, psf, wcs):
+        """
+        Grab square PSF cutout images
+
+        :param psf: a DES_PSFEx instance 
+        :param wcs: (astropy.WCS) the wcs for the tile
+
+        :return: 3D Numpy array
+        """
         object_x, object_y = self.get_object_xy(wcs)
         
-        psf_cutouts = np.empty((len(object_x), self.psf_cutout_size, self.psf_cutout_size), dtype=np.double)
+        psf_cutouts = np.empty((len(self.coadd_ids), self.psf_cutout_size, self.psf_cutout_size), dtype=np.double)
         for i, (x, y) in enumerate(zip(object_x, object_y)):
             pos = galsim.PositionD(x,y)
             psfimg = psf.getPSFArray(pos)
             center = (psfimg.shape[0] // 2, psfimg.shape[1] // 2)
             psfimg = self.single_cutout(psfimg, center, self.psf_cutout_size)
-            psf_cutouts.append(psfimg)
-        return np.array(psf_cutouts)
+            psf_cutouts[1] = psfimg
+        return psf_cutouts
 
-    def combine_bands(self, bands=('g', 'r', 'i', 'z')):
+    def combine_bands(self):
         """
-        Get cutouts from all bands and stack into one array
+        Get cutouts (both image and psf) from all bands and stack into one array
 
         :return: image_array: (np.Array) shape = (number of cutouts, number of bands,
                                                   cutout_size, cutout_size)
@@ -232,18 +241,28 @@ class CutoutProducer:
         if not hasattr(self, "coadd_ids"):
             self.get_coadd_ids()
 
-        image_array = np.empty((len(bands), len(self.coadd_ids), self.cutout_size, self.cutout_size), dtype=np.double)
-
-        for i, band in enumerate(bands):
+        image_array = np.empty((len(self.bands), len(self.coadd_ids), self.cutout_size, self.cutout_size), dtype=np.double)
+        psf_array = np.empty((len(self.bands), len(self.coadd_ids), self.psf_cutout_size, self.psf_cutout_size), dtype=np.double)
+        
+        for i, band in enumerate(self.bands):
+            # Open image file
             image, wcs = self.read_tile_image(band)
-            cutouts = self.cutout_objects(image, wcs)
-            image_array[i] = cutouts
+            psf = self.read_psf(band)
 
+            # Cutout images
+            image_cutouts = self.cutout_objects(image, wcs)
+            image_array[i] = image_cutouts
+
+            # Cutout psfs
+            psf_cutouts = cutout_psfs(psf, wcs)
+            psf_array[i] = psf_cutouts
+            
         image_array = np.swapaxes(image_array, 0, 1)
+        psf_array = np.swapaxes(psf_array, 0, 1)
 
-        return image_array
+        return image_array, psf_array
 
-    def produce_cutout_file(self, image_array, out_dir=''):
+    def produce_cutout_file(self, image_array, psf_array, out_dir=''):
         """
         Organize cutout data into an output file
 
