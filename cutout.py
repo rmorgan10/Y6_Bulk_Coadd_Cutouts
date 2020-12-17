@@ -191,8 +191,7 @@ class CutoutProducer:
         # return a misshapen cutout, and this will throw an error
         cutouts = np.empty((len(ras), self.cutout_size, self.cutout_size), dtype=np.double)
         for i, (x, y) in enumerate(zip(object_x, object_y)):
-            # FIXME: what is 'width'? not defined
-            cutouts[i] = self.single_cutout(image, (x, y), width)
+            cutouts[i] = self.single_cutout(image, (x, y), self.cutout_size)
         return cutouts
 
     def single_cutout(self, image, center, width=None):
