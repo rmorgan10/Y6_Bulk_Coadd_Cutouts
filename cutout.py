@@ -38,7 +38,7 @@ class CutoutProducer:
     FITS file.
 
     """
-    
+
     def __init__(self, tilename, cutout_size, psf_cutout_size, bands="griz",
                  metadata_path='/data/des81.b/data/stronglens/Y6_CUTOUT_METADATA/',
                  coadds_path='/data/des40.b/data/des/y6a2/coadd/image/',
@@ -96,14 +96,26 @@ class CutoutProducer:
     def get_tile_psf_filename(self, band):
         """
         construct the filepath to the coadd tile PSF model
-        
+
         :param band: (str) one of ('g', 'r', 'i', 'z', 'Y')
         :return: path: (str) absolute path to tile
         """
+        # FIXME: This is mostly duplication of `get_tile_filename`. Good
+        # way to combine them?
         # On Fermilab machines, look for files like
         # /data/des40.b/data/des/y6a2/coadd/image/DES2228+0209/DES2228+0209_r4575p01_i_psfcat.psf
         # Probably we want to define a self.psfdata_path in the __init__ function and use that here
-        raise NotImplementedError("Someone needs to do this")
+        guess = os.path.join(self.coadds_path, self.tilename,
+                             f'{self.tilename}_r*_{band}_psfcat.psf')
+
+        matches = glob.glob(guess)
+
+        if len(matches) > 1:
+            return ValueError('error - more than one possible coadd')
+        elif not matches:
+            raise ValueError('no images found')
+
+        return matches[0]
 
     def read_tile_image(self, band):
         """
@@ -223,6 +235,7 @@ class CutoutProducer:
         object_x, object_y = self.get_object_xy(wcs)
         
         psf_cutouts = np.empty((len(self.coadd_ids), self.psf_cutout_size, self.psf_cutout_size), dtype=np.double)
+
         for i, (x, y) in enumerate(zip(object_x, object_y)):
             pos = galsim.PositionD(x,y)
             psfimg = psf.getPSFArray(pos)
@@ -298,11 +311,14 @@ if __name__ == "__main__":
     assert len(sys.argv) == 2, "Tilename must be given as a a command-line argument"
     tilename = sys.argv[1]
     CUTOUT_SIZE = 45
+    PSF_CUTOUT_SIZE = 45
 
-    cutout_prod = CutoutProducer(tilename, CUTOUT_SIZE)
+    cutout_prod = CutoutProducer(tilename, CUTOUT_SIZE, PSF_CUTOUT_SIZE)
 
     for band in 'grizY':
-        path = cutout_prod.get_tile_filename(band)
-        assert os.path.exists(path)
+        tile_path = cutout_prod.get_tile_filename(band)
+        assert os.path.exists(tile_path), "Coadd image should exist"
+        psf_path = cutout_prod.get_tile_psf_filename(band)
+        assert os.path.exists(psf_path), "PSF file should exist"
 
     raise NotImplementedError("Someone needs to do this")
