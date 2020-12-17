@@ -41,7 +41,8 @@ class CutoutProducer:
     
     def __init__(self, tilename, cutout_size, psf_cutout_size,
                  metadata_path='/data/des81.b/data/stronglens/Y6_CUTOUT_METADATA/',
-                 coadds_path='/data/des40.b/data/des/y6a2/coadd/image'):
+                 coadds_path='/data/des40.b/data/des/y6a2/coadd/image/',
+                 psf_path='/data/des40.b/data/des/y6a2/coadd/image/'):
         """
         Initialize a CutoutProducer.
 
@@ -50,7 +51,8 @@ class CutoutProducer:
         :param psf_cutout_size: (int) side length in pixels of desired PSF cutouts
         """
         self.metadata_path = metadata_path
-        self.coadds_path = coadds_path 
+        self.coadds_path = coadds_path
+        self.psf_path = psf_path
         self.metadata_suffix = ".tab.gz"
         self.tilename = tilename
         self.cutout_size = cutout_size
