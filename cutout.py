@@ -43,7 +43,7 @@ class CutoutProducer:
 =======
 >>>>>>> fast forward cutout.py
     
-    def __init__(self, tilename, cutout_size, psf_cutout_size,
+    def __init__(self, tilename, cutout_size, psf_cutout_size, bands,
                  metadata_path='/data/des81.b/data/stronglens/Y6_CUTOUT_METADATA/',
 <<<<<<< HEAD
                  coadds_path='/data/des40.b/data/des/y6a2/coadd/image'):
@@ -65,6 +65,7 @@ class CutoutProducer:
 <<<<<<< HEAD
 <<<<<<< HEAD
         :param psf_cutout_size: (int) side length in pixels of desired PSF cutouts
+        :param bands: (str) bands to include; something like "griz" or "grizY"
         """
         self.metadata_path = metadata_path
 <<<<<<< HEAD
@@ -88,6 +89,7 @@ class CutoutProducer:
         self.tilename = tilename
         self.cutout_size = cutout_size
         self.psf_cutout_size = psf_cutout_size
+        self.bands = bands
         return
 
     def read_metadata(self):
