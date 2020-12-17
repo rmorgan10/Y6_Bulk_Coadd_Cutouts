@@ -6,6 +6,7 @@
 #   - Jimena Gonzalez (sgonzalezloz@wisc.edu)
 #   - Keith Bechtol (kbechtol@wisc.edu)
 #   - Erik Zaborowski (ezaborowski@uchicago.edu)
+#   - Simon Birrer (sibirrer@gmail.com)
 
 import glob
 import os
@@ -20,7 +21,6 @@ import pandas as pd
 import galsim
 from galsim.des.des_psfex import DES_PSFEx
 
-# TODO: tests
 
 class CutoutProducer:
     """
@@ -52,6 +52,8 @@ class CutoutProducer:
         :param cutout_size: (int) side length in pixels of desired cutouts
         :param psf_cutout_size: (int) side length in pixels of desired PSF cutouts
         :param bands: (str) bands to include; something like "griz" or "grizY"
+        :param coadds_path: (str) path relative to the COADD images (organized as tiles)
+        :param psf_path: (str) path relative to the PSF files (organized as tiles)
         """
         self.metadata_path = metadata_path
         self.coadds_path = coadds_path 
@@ -189,7 +191,8 @@ class CutoutProducer:
         # return a misshapen cutout, and this will throw an error
         cutouts = np.empty((len(ras), self.cutout_size, self.cutout_size), dtype=np.double)
         for i, (x, y) in enumerate(zip(object_x, object_y)):
-            cutouts[i] = single_cutout(image, (x, y), width)
+            # FIXME: what is 'width'? not defined
+            cutouts[i] = self.single_cutout(image, (x, y), width)
         return cutouts
 
     def single_cutout(self, image, center, width=None):
@@ -208,10 +211,10 @@ class CutoutProducer:
         if width > max(image.size):
             raise ValueError('Requested cutout is larger than image size')
         if (width % 2) == 0:
-            return image[x - width//2 : x + width//2,
-                         y - width//2 : y + width//2]
-        return image[x - width//2 : x + width//2 + 1,
-                     y - width//2 : y + width//2 + 1]
+            return image[x - width//2: x + width//2,
+                         y - width//2: y + width//2]
+        return image[x - width//2: x + width//2 + 1,
+                     y - width//2: y + width//2 + 1]
 
     def read_psf(self, band):
         """
@@ -220,7 +223,7 @@ class CutoutProducer:
         :param band: (str) band to target
         :return: a DES_PSFEx instance
         """
-        filename = self.get_tile_psf_filename(self, band)
+        filename = self.get_tile_psf_filename(band)
         psf = DES_PSFEx(filename)
         return psf
     
@@ -329,6 +332,6 @@ if __name__ == "__main__":
     # Produce the cutouts
     cutout_prod.read_metadata()
     image_array, psf_array = cutout_prod.combine_bands()
-    cutout_prod.produce_cutout_file(image_array, psf_array, outdir=OUTDIR)
+    cutout_prod.produce_cutout_file(image_array, psf_array, out_dir=OUTDIR)
 
 
