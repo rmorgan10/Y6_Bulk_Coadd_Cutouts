@@ -5,6 +5,7 @@
 #   - Jackson O'Donnell (jacksonhodonnell@gmail.com)
 #   - Jimena Gonzalez (sgonzalezloz@wisc.edu)
 #   - Keith Bechtol (kbechtol@wisc.edu)
+#   - Erik Zaborowski (ezaborowski@uchicago.edu)
 
 import glob
 import os
@@ -267,7 +268,7 @@ class CutoutProducer:
             image_array[i] = image_cutouts
 
             # Cutout psfs
-            psf_cutouts = cutout_psfs(psf, wcs)
+            psf_cutouts = self.cutout_psfs(psf, wcs)
             psf_array[i] = psf_cutouts
             
         image_array = np.swapaxes(image_array, 0, 1)
@@ -312,13 +313,22 @@ if __name__ == "__main__":
     tilename = sys.argv[1]
     CUTOUT_SIZE = 45
     PSF_CUTOUT_SIZE = 45
+    BANDS = "griz"
+    OUTDIR = "" # fill in once a path has been decided
 
-    cutout_prod = CutoutProducer(tilename, CUTOUT_SIZE, PSF_CUTOUT_SIZE)
+    # Make a CutoutProducer for the tile
+    cutout_prod = CutoutProducer(tilename, CUTOUT_SIZE, PSF_CUTOUT_SIZE, bands=BANDS)
 
-    for band in 'grizY':
+    # Quit if missing files
+    for band in cutout_prod.bands:
         tile_path = cutout_prod.get_tile_filename(band)
         assert os.path.exists(tile_path), "Coadd image should exist"
         psf_path = cutout_prod.get_tile_psf_filename(band)
         assert os.path.exists(psf_path), "PSF file should exist"
+        
+    # Produce the cutouts
+    cutout_prod.read_metadata()
+    image_array, psf_array = cutout_prod.combine_bands()
+    cutout_prod.produce_cutout_file(image_array, psf_array, outdir=OUTDIR)
 
-    raise NotImplementedError("Someone needs to do this")
+
