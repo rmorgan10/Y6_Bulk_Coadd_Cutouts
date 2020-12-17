@@ -39,7 +39,7 @@ class CutoutProducer:
 
     """
     
-    def __init__(self, tilename, cutout_size, psf_cutout_size,
+    def __init__(self, tilename, cutout_size, psf_cutout_size, bands,
                  metadata_path='/data/des81.b/data/stronglens/Y6_CUTOUT_METADATA/',
                  coadds_path='/data/des40.b/data/des/y6a2/coadd/image/',
                  psf_path='/data/des40.b/data/des/y6a2/coadd/image/'):
@@ -49,6 +49,7 @@ class CutoutProducer:
         :param tilename: (str) name of DES tile; something like 'DES0536-5457'
         :param cutout_size: (int) side length in pixels of desired cutouts
         :param psf_cutout_size: (int) side length in pixels of desired PSF cutouts
+        :param bands: (str) bands to include; something like "griz" or "grizY"
         """
         self.metadata_path = metadata_path
         self.coadds_path = coadds_path
@@ -57,6 +58,7 @@ class CutoutProducer:
         self.tilename = tilename
         self.cutout_size = cutout_size
         self.psf_cutout_size = psf_cutout_size
+        self.bands = bands
         return
 
     def read_metadata(self):
