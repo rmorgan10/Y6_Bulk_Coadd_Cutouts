@@ -222,7 +222,7 @@ class CutoutProducer:
             psf_cutouts.append(psfimg)
         return np.array(psf_cutouts)
 
-    def combine_bands(self, bands=('g', 'r', 'i', 'z')):
+    def combine_bands(self):
         """
         Get cutouts from all bands and stack into one array
 
@@ -232,9 +232,9 @@ class CutoutProducer:
         if not hasattr(self, "coadd_ids"):
             self.get_coadd_ids()
 
-        image_array = np.empty((len(bands), len(self.coadd_ids), self.cutout_size, self.cutout_size), dtype=np.double)
+        image_array = np.empty((len(self.bands), len(self.coadd_ids), self.cutout_size, self.cutout_size), dtype=np.double)
 
-        for i, band in enumerate(bands):
+        for i, band in enumerate(self.bands):
             image, wcs = self.read_tile_image(band)
             cutouts = self.cutout_objects(image, wcs)
             image_array[i] = cutouts
