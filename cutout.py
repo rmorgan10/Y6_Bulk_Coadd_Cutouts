@@ -78,7 +78,6 @@ class CutoutProducer:
         self.tilename = tilename
         self.cutout_size = cutout_size
         self.psf_cutout_size = psf_cutout_size
-        self.read_metadata()
         return
 
     def read_metadata(self):
