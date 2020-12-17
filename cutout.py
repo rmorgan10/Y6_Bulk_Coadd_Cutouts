@@ -38,53 +38,23 @@ class CutoutProducer:
     FITS file.
 
     """
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> fast forward cutout.py
     
     def __init__(self, tilename, cutout_size, psf_cutout_size, bands="griz",
                  metadata_path='/data/des81.b/data/stronglens/Y6_CUTOUT_METADATA/',
-<<<<<<< HEAD
-                 coadds_path='/data/des40.b/data/des/y6a2/coadd/image'):
-<<<<<<< HEAD
-=======
-    def __init__(self, tilename, cutout_size, path="/data/des81.b/data/stronglens/Y6_CUTOUT_METADATA/"):
->>>>>>> make path a default arg
-=======
->>>>>>> fast forward cutout.py
-=======
                  coadds_path='/data/des40.b/data/des/y6a2/coadd/image/',
                  psf_path='/data/des40.b/data/des/y6a2/coadd/image/'):
->>>>>>> add psf_path to init
+
         """
         Initialize a CutoutProducer.
 
         :param tilename: (str) name of DES tile; something like 'DES0536-5457'
         :param cutout_size: (int) side length in pixels of desired cutouts
-<<<<<<< HEAD
-<<<<<<< HEAD
         :param psf_cutout_size: (int) side length in pixels of desired PSF cutouts
         :param bands: (str) bands to include; something like "griz" or "grizY"
         """
         self.metadata_path = metadata_path
-<<<<<<< HEAD
         self.coadds_path = coadds_path 
-=======
-        :param path: (str) relative metadata file path to location of script or absolute path
-        """
-        self.metadata_path = path
->>>>>>> make path a default arg
-=======
-        :param psf_cutout_size: (int) side length in pixels of desired PSF cutouts
-        """
-        self.metadata_path = metadata_path
-        self.coadds_path = coadds_path 
->>>>>>> fast forward cutout.py
-=======
-        self.coadds_path = coadds_path
         self.psf_path = psf_path
->>>>>>> add psf_path to init
         self.metadata_suffix = ".tab.gz"
         self.tilename = tilename
         self.cutout_size = cutout_size
