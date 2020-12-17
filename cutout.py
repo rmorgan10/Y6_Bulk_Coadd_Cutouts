@@ -232,9 +232,15 @@ class CutoutProducer:
         if not hasattr(self, "coadd_ids"):
             self.get_coadd_ids()
 
-        image_array = np.empty((len(self.coadd_ids), len(bands), self.cutout_size, self.cutout_size), dtype=np.double)
+        image_array = np.empty((len(bands), len(self.coadd_ids), self.cutout_size, self.cutout_size), dtype=np.double)
 
-        raise NotImplementedError("Someone needs to do this")
+        for i, band in enumerate(bands):
+            image, wcs = self.read_tile_image(band)
+            cutouts = self.cutout_objects(image, wcs)
+            image_array[i] = cutouts
+
+        image_array = np.swapaxes(image_array, 0, 1)
+
         return image_array
 
     def produce_cutout_file(self, image_array, out_dir=''):
