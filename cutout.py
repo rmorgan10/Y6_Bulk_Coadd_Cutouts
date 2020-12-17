@@ -161,11 +161,8 @@ class CutoutProducer:
         :param image: (np.Array) the image data contained in the file
         :param wcs: (astropy.WCS) the wcs for the file
         """
-        ras, decs = self.get_locations()
-
-        # Get pixel of each location, rounding
-        pixel_x, pixel_y = wcs.world_to_pixel(SkyCoord(ras, decs, unit='deg'))
-        object_x, object_y = pixel_x.round().astype(int), pixel_y.round().astype(int)
+        # Get index locations of all objects
+        object_x, object_y = self.get_object_xy(wcs)
 
         # Shout if any object is outside of tile
         if not np.all((0 < object_x) & (object_x < image.shape[0])
