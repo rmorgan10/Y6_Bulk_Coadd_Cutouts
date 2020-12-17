@@ -4,6 +4,7 @@
 #   - Robert Morgan (robert.morgan@wisc.edu)
 #   - Jackson O'Donnell (jacksonhodonnell@gmail.com)
 #   - Jimena Gonzalez (sgonzalezloz@wisc.edu)
+#   - Keith Bechtol (kbechtol@wisc.edu)
 
 import glob
 import os
@@ -15,8 +16,10 @@ from astropy.wcs import WCS
 import numpy as np
 import pandas as pd
 
+import galsim
+from galsim.des.des_psfex import DES_PSFEx
+
 # TODO: tests
-# also TODO: PSFs
 
 class CutoutProducer:
     """
@@ -35,7 +38,8 @@ class CutoutProducer:
     FITS file.
 
     """
-    def __init__(self, tilename, cutout_size,
+    
+    def __init__(self, tilename, cutout_size, psf_cutout_size,
                  metadata_path='/data/des81.b/data/stronglens/Y6_CUTOUT_METADATA/',
                  coadds_path='/data/des40.b/data/des/y6a2/coadd/image'):
         """
@@ -43,12 +47,14 @@ class CutoutProducer:
 
         :param tilename: (str) name of DES tile; something like 'DES0536-5457'
         :param cutout_size: (int) side length in pixels of desired cutouts
+        :param psf_cutout_size: (int) side length in pixels of desired PSF cutouts
         """
         self.metadata_path = metadata_path
         self.coadds_path = coadds_path 
         self.metadata_suffix = ".tab.gz"
         self.tilename = tilename
         self.cutout_size = cutout_size
+        self.psf_cutout_size = psf_cutout_size
         self.read_metadata()
         return
 
@@ -83,6 +89,17 @@ class CutoutProducer:
 
         return matches[0]
 
+    def get_tile_psf_filename(self, band):
+        """
+        construct the filepath to the coadd tile PSF model
+        
+        :param band: (str) one of ('g', 'r', 'i', 'z', 'Y')
+        :return: path: (str) absolute path to tile
+        """
+        # On Fermilab machines, look for files like
+        # /data/des40.b/data/des/y6a2/coadd/image/DES2228+0209/DES2228+0209_r4575p01_i_psfcat.psf
+        # Probably we want to define a self.psfdata_path in the __init__ function and use that here
+        raise NotImplementedError("Someone needs to do this")
 
     def read_tile_image(self, band):
         """
@@ -99,7 +116,6 @@ class CutoutProducer:
         wcs = WCS(f[1].header)
         f.close()
         return image, wcs
-
 
     def get_locations(self):
         """
@@ -123,6 +139,20 @@ class CutoutProducer:
         self.coadd_ids = np.array(self.metadata['COADD_OBJECT_ID'].values, dtype=int)
         return
 
+    def get_object_xy(self, wcs):
+        """
+        Get the x, y coordinates within the coadd tile
+
+        :return: object_x: (np.Array) all x values of objects in the tile
+        :return: object_y: (np.Array) all y values of objects in the tile
+        """
+        ras, decs = self.get_locations()
+
+        # Get pixel of each location, rounding
+        pixel_x, pixel_y = wcs.world_to_pixel(SkyCoord(ras, decs, unit='deg'))
+        object_x, object_y = pixel_x.round().astype(int), pixel_y.round().astype(int)
+        return object_x, object_y
+
     def cutout_objects(self, image, wcs):
         """
         Grab square arrays from image using the wcs
@@ -142,13 +172,13 @@ class CutoutProducer:
             raise ValueError('Some objects centered out of tile')
 
         # FIXME: If an object is too close to a tile edge, single_cutout will
-        # return a misshapen cutout, and this will through an error
+        # return a misshapen cutout, and this will throw an error
         cutouts = np.empty((len(ras), self.cutout_size, self.cutout_size), dtype=np.double)
         for i, (x, y) in enumerate(zip(object_x, object_y)):
             cutouts[i] = single_cutout(image, (x, y), width)
         return cutouts
 
-    def single_cutout(self, image, center):
+    def single_cutout(self, image, center, width=None):
         """
         Creates a single cutout from an image.
 
@@ -159,12 +189,38 @@ class CutoutProducer:
         :return: 2D Numpy array, shape = (width, width)
         """
         x, y = center
-        width = self.cutout_size
+        if width is None:
+            width = self.cutout_size
+        if width > max(image.size):
+            raise ValueError('Requested cutout is larger than image size')
         if (width % 2) == 0:
             return image[x - width//2 : x + width//2,
                          y - width//2 : y + width//2]
         return image[x - width//2 : x + width//2 + 1,
                      y - width//2 : y + width//2 + 1]
+
+    def cutout_psfs(self, wcs):
+        """
+        Grab square PSF cutout images
+
+        :param wcs: (astropy.WCS) the wcs for the tile
+        :param cutout_size: (int) 
+
+        :return: 3D Numpy array
+        """
+        filename = self.get_tile_psf_filename(self, band)
+        psf = DES_PSFEx(filename)
+        
+        object_x, object_y = self.get_object_xy(wcs)
+        
+        psf_cutouts = np.empty((len(object_x), self.psf_cutout_size, self.psf_cutout_size), dtype=np.double)
+        for i, (x, y) in enumerate(zip(object_x, object_y)):
+            pos = galsim.PositionD(x,y)
+            psfimg = psf.getPSFArray(pos)
+            center = (psfimg.shape[0] // 2, psfimg.shape[1] // 2)
+            psfimg = self.single_cutout(psfimg, center, self.psf_cutout_size)
+            psf_cutouts.append(psfimg)
+        return np.array(psf_cutouts)
 
     def combine_bands(self, bands=('g', 'r', 'i', 'z')):
         """
