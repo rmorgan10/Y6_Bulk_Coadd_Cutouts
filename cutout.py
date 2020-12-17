@@ -43,7 +43,7 @@ class CutoutProducer:
 =======
 >>>>>>> fast forward cutout.py
     
-    def __init__(self, tilename, cutout_size, psf_cutout_size, bands,
+    def __init__(self, tilename, cutout_size, psf_cutout_size, bands="griz",
                  metadata_path='/data/des81.b/data/stronglens/Y6_CUTOUT_METADATA/',
 <<<<<<< HEAD
                  coadds_path='/data/des40.b/data/des/y6a2/coadd/image'):
