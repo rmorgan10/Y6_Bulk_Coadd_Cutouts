@@ -219,6 +219,7 @@ class CutoutProducer:
         """
         filename = self.get_tile_psf_filename(band)
         psf = DES_PSFEx(filename)
+        self.psf_samp = psf.getSampleScale()
         return psf
     
     def cutout_psfs(self, psf, wcs):
@@ -296,7 +297,7 @@ class CutoutProducer:
         image = fits.ImageHDU(image_array, name="IMAGE")
 
         # Make the PSF HDU
-        psf = fits.ImageHDU(psf_array, name="PSF")
+        psf = fits.ImageHDU(psf_array, name="PSF", header=fits.Header({'PSF_SAMP': self.psf_samp}))
 
         # Write the file
         hdu_list = fits.HDUList([primary, image, psf])
