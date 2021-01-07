@@ -139,6 +139,7 @@ class TestCutoutProducer(unittest.TestCase):
         self.cutout_producer.get_coadd_ids()
         image, wcs = self.cutout_producer.read_tile_image('g')
         psf = self.cutout_producer.read_psf('g')
+        self.assertTrue(hasattr(self.cutout_producer, "psf_samp"))
         psf_cutouts = self.cutout_producer.cutout_psfs(psf, wcs)
         self.assertEqual(len(np.shape(psf_cutouts)), 3)
         self.assertEqual(np.shape(psf_cutouts)[0], len(self.cutout_producer.coadd_ids))
@@ -183,6 +184,7 @@ class TestCutoutProducer(unittest.TestCase):
         # check psf array
         np.testing.assert_array_equal(np.shape(hdu[2].data), np.shape(psf_array))
         np.testing.assert_allclose(hdu[2].data, psf_array)
+        self.assertEqual(hdu[2].header['PSF_SAMP'], self.cutout_producer.psf_samp)
 
         hdu.close()
 
