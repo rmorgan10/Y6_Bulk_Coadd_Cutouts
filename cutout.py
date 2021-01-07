@@ -103,11 +103,6 @@ class CutoutProducer:
         :param band: (str) one of ('g', 'r', 'i', 'z', 'Y')
         :return: path: (str) absolute path to tile
         """
-        # FIXME: This is mostly duplication of `get_tile_filename`. Good
-        # way to combine them?
-        # On Fermilab machines, look for files like
-        # /data/des40.b/data/des/y6a2/coadd/image/DES2228+0209/DES2228+0209_r4575p01_i_psfcat.psf
-        # Probably we want to define a self.psfdata_path in the __init__ function and use that here
         guess = os.path.join(self.coadds_path, self.tilename,
                              f'{self.tilename}_r*_{band}_psfcat.psf')
 
@@ -296,10 +291,6 @@ class CutoutProducer:
 
         # Make the ID HDU
         primary = fits.PrimaryHDU(self.coadd_ids)
-
-        #col = fits.Column(name='COADD_ID', format='int16', array=self.coadd_ids)
-        #cols = fits.ColDefs([col])
-        #header = fits.BinTableHDU.from_columns(cols, name='IDS')
 
         # Make the IMAGE HDU
         image = fits.ImageHDU(image_array, name="IMAGE")
