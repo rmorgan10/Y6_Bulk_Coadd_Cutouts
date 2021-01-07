@@ -189,7 +189,7 @@ class CutoutProducer:
 
         # FIXME: If an object is too close to a tile edge, single_cutout will
         # return a misshapen cutout, and this will throw an error
-        cutouts = np.empty((len(ras), self.cutout_size, self.cutout_size), dtype=np.double)
+        cutouts = np.empty((len(self.coadd_ids), self.cutout_size, self.cutout_size), dtype=np.double)
         for i, (x, y) in enumerate(zip(object_x, object_y)):
             cutouts[i] = self.single_cutout(image, (x, y), self.cutout_size)
         return cutouts
@@ -207,7 +207,7 @@ class CutoutProducer:
         x, y = center
         if width is None:
             width = self.cutout_size
-        if width > max(image.size):
+        if width > min(image.shape):
             raise ValueError('Requested cutout is larger than image size')
         if (width % 2) == 0:
             return image[x - width//2: x + width//2,
