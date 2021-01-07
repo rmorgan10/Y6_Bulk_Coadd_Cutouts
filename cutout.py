@@ -295,15 +295,20 @@ class CutoutProducer:
             self.get_coadd_ids()
 
         # Make the ID HDU
-        col = fits.Column(name='COADD_ID', format='int16', array=self.coadd_ids)
-        cols = fits.ColDefs([col])
-        header = fits.BinTableHDU.from_columns(cols, name='IDS')
+        primary = fits.PrimaryHDU(self.coadd_ids)
+
+        #col = fits.Column(name='COADD_ID', format='int16', array=self.coadd_ids)
+        #cols = fits.ColDefs([col])
+        #header = fits.BinTableHDU.from_columns(cols, name='IDS')
 
         # Make the IMAGE HDU
-        image = fits.PrimaryHDU(image_array)
+        image = fits.ImageHDU(image_array, name="IMAGE")
+
+        # Make the PSF HDU
+        psf = fits.ImageHDU(psf_array, name="PSF")
 
         # Write the file
-        hdu_list = fits.HDUList([image, header])
+        hdu_list = fits.HDUList([primary, image, psf])
         if not out_dir.endswith('/') and out_dir != '':
             out_dir += '/'
         hdu_list.writeto(f'{out_dir}{self.tilename}.fits', overwrite=True)
