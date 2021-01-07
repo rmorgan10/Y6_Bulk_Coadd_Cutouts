@@ -129,8 +129,11 @@ class TestCutoutProducer(unittest.TestCase):
         self.assertEqual(np.shape(cutout)[0], width)
         self.assertEqual(np.shape(cutout)[1], width)
 
-        raise NotImplementedError("I'd like to test that the pixel values in the cutout"
-                                  "match up with the pixel values in the image")
+        # test pixel values
+        self.assertEqual(cutout[0][0], image[center[0] - width // 2][center[1] - width // 2])
+        self.assertEqual(cutout[0][-1], image[center[0] - width // 2][center[1] + width // 2])
+        self.assertEqual(cutout[-1][0], image[center[0] + width // 2][center[1] - width // 2])
+        self.assertEqual(cutout[-1][-1], image[center[0] + width // 2][center[1] + width // 2])
 
     def test_cutout_psfs(self):
         self.cutout_producer.get_coadd_ids()
