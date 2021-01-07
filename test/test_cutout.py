@@ -160,13 +160,32 @@ class TestCutoutProducer(unittest.TestCase):
         self.assertEqual(np.shape(psf_array)[3], self.cutout_producer.psf_cutout_size)
 
     def test_produce_cutout_file(self):
+        # Make cutouts
         image_array, psf_array = self.cutout_producer.combine_bands()
         self.cutout_producer.produce_cutout_file(image_array, psf_array, out_dir="test_data/")
+        
+        # Verify existence of output file
         outfile_name = f'test_data/{self.cutout_producer.tilename}.fits'
-
         self.assertTrue(os.path.exists(outfile_name))
 
-        raise NotImplementedError("Open the fits file and check that everything looks good")
+        # Verify existence of data products
+        hdu = fits.open(outfile_name)
+        self.assertEqual(len(hdu), 3)
+
+        # check coadd ids
+        self.assertEqual(len(hdu[0].data), len(self.cutout_producer.coadd_ids))
+        np.testing.assert_array_equal(hdu[0].data, self.cutout_producer.coadd_ids)
+
+        # check image array
+        np.testing.assert_array_equal(np.shape(hdu[1].data), np.shape(image_array))
+        np.testing.assert_allclose(hdu[1].data, image_array)
+
+        # check psf array
+        np.testing.assert_array_equal(np.shape(hdu[2].data), np.shape(psf_array))
+        np.testing.assert_allclose(hdu[2].data, psf_array)
+
+        hdu.close()
+
 
 
 if __name__ == "__main__":
