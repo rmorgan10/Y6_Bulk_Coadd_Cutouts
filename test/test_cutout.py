@@ -109,7 +109,7 @@ class TestCutoutProducer(unittest.TestCase):
         self.assertEqual(np.shape(cutouts)[1], self.cutout_producer.cutout_size)
         self.assertEqual(np.shape(cutouts)[2], self.cutout_producer.cutout_size)
         self.assertEqual(len(np.shape(cutouts)), 3)
-        self.assertIsInstance(cutouts[0][0][0], (float, int))
+        self.assertIsInstance(cutouts[0][0][0], (int, int))
 
     def test_single_cutout(self):
         image, wcs = self.cutout_producer.read_tile_image('g')
