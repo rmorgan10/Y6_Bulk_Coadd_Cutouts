@@ -294,27 +294,32 @@ class CutoutProducer:
             shifted_max[:,:,np.newaxis,np.newaxis] * 65535).astype(np.uint16) 
 
         return int_arr, original_min, shifted_max
-            
-        
+
 
     def produce_cutout_file(self, image_array, psf_array, out_dir=''):
         """
         Organize cutout data into an output file
 
         :param image_array: (np.array) contains all images. Has
-                            shape = (len(coadd_ids), 4, 65, 65)
-                             - 4 bands = g,r,i,z
-                             - 65 x 65 = image height x width
-                                - doesn't have to be 65 x 65
+                            shape = (len(coadd_ids), num_bands, cutout_size, cutout_size)
+        :param psf_array: (np.array) contains all psfs. Has
+                            shape = (len(coadd_ids), num_bands, psf_size, psf_size) 
         :param out_dir: (str) path to out directory
            - leave as default '' for current directory
 
         """
+        # Scale the image and psf arrays
+        image_array, img_min, img_scale = self.scale_array_to_ints(image_array)
+        psf_array, psf_min, psf_scale = self.scale_array_to_ints(psf_array)
+
+        # Make an empty PRIMARY HDU
+        primary = fits.PrimaryHDU()
+
+        # Make the COADD_ID HDU
         if not hasattr(self, "coadd_ids"):
             self.get_coadd_ids()
-
-        # Make the ID HDU
-        primary = fits.PrimaryHDU(self.coadd_ids)
+        col = fits.Column(name='COADD_OBJECT_ID', array=self.coadd_ids, format='J')
+        coadd_ids = fits.BinTableHDU.from_columns([col], name="CUTOUT_ID")
 
         # Make the IMAGE HDU
         image = fits.ImageHDU(image_array, name="IMAGE")
@@ -322,8 +327,16 @@ class CutoutProducer:
         # Make the PSF HDU
         psf = fits.ImageHDU(psf_array, name="PSF", header=fits.Header({'PSF_SAMP': self.psf_samp}))
 
+        # Make the img_min and img_scale HDUs
+        img_min = fits.ImageHDU(img_min, name="IMG_MIN")
+        img_scale = fits.ImageHDU(img_scale, name="IMG_SCALE")
+
+        # Make the psf_min and psf_scale HDUs
+        psf_min = fits.ImageHDU(psf_min, name="PSF_MIN")
+        psf_scale = fits.ImageHDU(psf_scale, name="PSF_SCALE")
+
         # Write the file
-        hdu_list = fits.HDUList([primary, image, psf])
+        hdu_list = fits.HDUList([primary, coadd_ids, image, psf, img_min, img_scale, psf_min, psf_scale])
         if not out_dir.endswith('/') and out_dir != '':
             out_dir += '/'
         hdu_list.writeto(f'{out_dir}{self.tilename}.fits', overwrite=True)
