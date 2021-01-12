@@ -274,6 +274,29 @@ class CutoutProducer:
 
         return image_array, psf_array
 
+    @staticmethod
+    def scale_array_to_ints(arr):
+        """
+        Scale an array of floats to ints 0-65535 (16-bit) using a per-image min-max scaling
+
+        Original (but slightly rounded) values are recoverable by
+            recovered_arr = int_arr / 65535 * shifted_max[:,:,np.newaxis,np.newaxis] + original_min[:,:,np.newaxis,np.newaxis]
+
+        :param arr: an 4-dimensional array of floats
+        :return: int_arr: the scaled and rounded version of arr, same shape
+        :return: original_min: an array of the original minimum value of arr, 2-d
+        :return: shifted_max: an array of the original maximum value of arr, 2-d
+        """
+        original_min = np.min(arr, axis=(-1, -2))
+        shifted_max = np.max(arr - original_min[:,:,np.newaxis,np.newaxis], axis=(-1, -2))
+        int_arr = np.rint(
+            (arr - original_min[:,:,np.newaxis,np.newaxis]) / 
+            shifted_max[:,:,np.newaxis,np.newaxis] * 65535).astype(np.uint16) 
+
+        return int_arr, original_min, shifted_max
+            
+        
+
     def produce_cutout_file(self, image_array, psf_array, out_dir=''):
         """
         Organize cutout data into an output file

@@ -109,7 +109,7 @@ class TestCutoutProducer(unittest.TestCase):
         self.assertEqual(np.shape(cutouts)[1], self.cutout_producer.cutout_size)
         self.assertEqual(np.shape(cutouts)[2], self.cutout_producer.cutout_size)
         self.assertEqual(len(np.shape(cutouts)), 3)
-        self.assertIsInstance(cutouts[0][0][0], (int, int))
+        self.assertIsInstance(cutouts[0][0][0], (float, int))
 
     def test_single_cutout(self):
         image, wcs = self.cutout_producer.read_tile_image('g')
@@ -159,6 +159,20 @@ class TestCutoutProducer(unittest.TestCase):
         self.assertEqual(np.shape(psf_array)[1], len(self.cutout_producer.bands))
         self.assertEqual(np.shape(psf_array)[2], self.cutout_producer.psf_cutout_size)
         self.assertEqual(np.shape(psf_array)[3], self.cutout_producer.psf_cutout_size)
+
+    def test_scale_array_to_ints(self):
+        arr = np.random.uniform(-600.0, 224084.0, (100, 4, 45, 45))
+        int_arr, original_min, shifted_max = self.cutout_producer.scale_array_to_ints(arr)
+        # test values
+        self.assertIsInstance(int_arr[0][0][0][0], np.uint16)
+        self.assertIsInstance(shifted_max[0][0], float)
+        self.assertIsInstance(original_min[0][0], float)
+        self.assertLessEqual(int_arr.max(), 65535)
+        self.assertGreaterEqual(int_arr.min(), 0)
+
+        # test recovery
+        orig_arr = int_arr / 65535 * shifted_max[:,:,np.newaxis,np.newaxis] + original_min[:,:,np.newaxis,np.newaxis]
+        np.testing.assert_allclose(orig_arr, arr, rtol=10.0, atol=10.0)
 
     def test_produce_cutout_file(self):
         # Make cutouts
