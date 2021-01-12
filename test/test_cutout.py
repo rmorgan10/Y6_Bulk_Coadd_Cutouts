@@ -160,10 +160,26 @@ class TestCutoutProducer(unittest.TestCase):
         self.assertEqual(np.shape(psf_array)[2], self.cutout_producer.psf_cutout_size)
         self.assertEqual(np.shape(psf_array)[3], self.cutout_producer.psf_cutout_size)
 
+    def test_scale_array_to_ints(self):
+        arr = np.random.uniform(-600.0, 224084.0, (100, 4, 45, 45))
+        int_arr, original_min, shifted_max = self.cutout_producer.scale_array_to_ints(arr)
+        # test values
+        self.assertIsInstance(int_arr[0][0][0][0], np.uint16)
+        self.assertIsInstance(shifted_max[0][0], float)
+        self.assertIsInstance(original_min[0][0], float)
+        self.assertLessEqual(int_arr.max(), 65535)
+        self.assertGreaterEqual(int_arr.min(), 0)
+
+        # test recovery
+        orig_arr = int_arr / 65535 * shifted_max[:,:,np.newaxis,np.newaxis] + original_min[:,:,np.newaxis,np.newaxis]
+        np.testing.assert_allclose(orig_arr, arr, rtol=10.0, atol=10.0)
+
     def test_produce_cutout_file(self):
         # Make cutouts
         image_array, psf_array = self.cutout_producer.combine_bands()
         self.cutout_producer.produce_cutout_file(image_array, psf_array, out_dir="test_data/")
+        image_array, img_min, img_scale = self.cutout_producer.scale_array_to_ints(image_array)
+        psf_array, psf_min, psf_scale = self.cutout_producer.scale_array_to_ints(psf_array)
         
         # Verify existence of output file
         outfile_name = f'test_data/{self.cutout_producer.tilename}.fits'
@@ -171,20 +187,26 @@ class TestCutoutProducer(unittest.TestCase):
 
         # Verify existence of data products
         hdu = fits.open(outfile_name)
-        self.assertEqual(len(hdu), 3)
+        self.assertEqual(len(hdu), 8)
 
         # check coadd ids
-        self.assertEqual(len(hdu[0].data), len(self.cutout_producer.coadd_ids))
-        np.testing.assert_array_equal(hdu[0].data, self.cutout_producer.coadd_ids)
+        self.assertEqual(len(hdu[1].data), len(self.cutout_producer.coadd_ids))
+        np.testing.assert_array_equal(hdu[1].data.astype(int), self.cutout_producer.coadd_ids)
 
         # check image array
-        np.testing.assert_array_equal(np.shape(hdu[1].data), np.shape(image_array))
-        np.testing.assert_allclose(hdu[1].data, image_array)
+        np.testing.assert_array_equal(np.shape(hdu[2].data), np.shape(image_array))
+        np.testing.assert_allclose(hdu[2].data, image_array)
 
         # check psf array
-        np.testing.assert_array_equal(np.shape(hdu[2].data), np.shape(psf_array))
-        np.testing.assert_allclose(hdu[2].data, psf_array)
-        self.assertEqual(hdu[2].header['PSF_SAMP'], self.cutout_producer.psf_samp)
+        np.testing.assert_array_equal(np.shape(hdu[3].data), np.shape(psf_array))
+        np.testing.assert_allclose(hdu[3].data, psf_array)
+        self.assertEqual(hdu[3].header['PSF_SAMP'], self.cutout_producer.psf_samp)
+
+        # check recovery arrays
+        np.testing.assert_allclose(hdu[4].data, img_min)
+        np.testing.assert_allclose(hdu[5].data, img_scale)
+        np.testing.assert_allclose(hdu[6].data, psf_min)
+        np.testing.assert_allclose(hdu[7].data, psf_scale)
 
         hdu.close()
 
