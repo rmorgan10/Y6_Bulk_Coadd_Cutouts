@@ -188,6 +188,7 @@ class CutoutProducer:
         cutouts = np.empty((len(self.coadd_ids), self.cutout_size, self.cutout_size), dtype=np.double)
         for i, (x, y) in enumerate(zip(object_x, object_y)):
             cutouts[i] = self.single_cutout(image, (x, y), self.cutout_size)
+
         return cutouts
 
     def single_cutout(self, image, center, width=None):
@@ -237,11 +238,12 @@ class CutoutProducer:
         psf_cutouts = np.empty((len(self.coadd_ids), self.psf_cutout_size, self.psf_cutout_size), dtype=np.double)
 
         for i, (x, y) in enumerate(zip(object_x, object_y)):
-            pos = galsim.PositionD(x,y)
+            pos = galsim.PositionI(x,y) 
             psfimg = psf.getPSFArray(pos)
             center = (psfimg.shape[0] // 2, psfimg.shape[1] // 2)
             psfimg = self.single_cutout(psfimg, center, self.psf_cutout_size)
-            psf_cutouts[1] = psfimg
+            psf_cutouts[i] = psfimg
+
         return psf_cutouts
 
     def combine_bands(self):
@@ -290,14 +292,6 @@ class CutoutProducer:
         """
         original_min = np.min(arr, axis=(-1, -2))
         shifted_max = np.max(arr - original_min[:,:,np.newaxis,np.newaxis], axis=(-1, -2))
-
-        #test for zeros
-        for i in range(len(arr)):
-            for j in range(len(arr[0])):
-                #if shifted_max[i, j] != 0:
-                #    print(i, j)
-                if arr[i,j].max() == arr[i,j].min():
-                    print(i, j, arr[i,j].max())
 
         int_arr = np.rint(
             (arr - original_min[:,:,np.newaxis,np.newaxis]) / 
