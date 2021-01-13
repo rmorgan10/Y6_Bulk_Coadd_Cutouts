@@ -178,15 +178,17 @@ class CutoutProducer:
         object_x, object_y = self.get_object_xy(wcs)
 
         # Shout if any object is outside of tile
-        if not np.all((0 < object_x) & (object_x < image.shape[0])
-                    & (0 < object_y) & (object_y < image.shape[1])):
+        if not np.all((0 < object_x) & (object_x < image.shape[1])
+                      & (0 < object_y) & (object_y < image.shape[0])):
             raise ValueError('Some objects centered out of tile')
+
 
         # FIXME: If an object is too close to a tile edge, single_cutout will
         # return a misshapen cutout, and this will throw an error
         cutouts = np.empty((len(self.coadd_ids), self.cutout_size, self.cutout_size), dtype=np.double)
         for i, (x, y) in enumerate(zip(object_x, object_y)):
             cutouts[i] = self.single_cutout(image, (x, y), self.cutout_size)
+
         return cutouts
 
     def single_cutout(self, image, center, width=None):
@@ -205,10 +207,10 @@ class CutoutProducer:
         if width > min(image.shape):
             raise ValueError('Requested cutout is larger than image size')
         if (width % 2) == 0:
-            return image[x - width//2: x + width//2,
-                         y - width//2: y + width//2]
-        return image[x - width//2: x + width//2 + 1,
-                     y - width//2: y + width//2 + 1]
+            return image[y - width//2: y + width//2,
+                         x - width//2: x + width//2]
+        return image[y - width//2: y + width//2 + 1,
+                     x - width//2: x + width//2 + 1]
 
     def read_psf(self, band):
         """
@@ -236,11 +238,12 @@ class CutoutProducer:
         psf_cutouts = np.empty((len(self.coadd_ids), self.psf_cutout_size, self.psf_cutout_size), dtype=np.double)
 
         for i, (x, y) in enumerate(zip(object_x, object_y)):
-            pos = galsim.PositionD(x,y)
+            pos = galsim.PositionI(x,y) 
             psfimg = psf.getPSFArray(pos)
             center = (psfimg.shape[0] // 2, psfimg.shape[1] // 2)
             psfimg = self.single_cutout(psfimg, center, self.psf_cutout_size)
-            psf_cutouts[1] = psfimg
+            psf_cutouts[i] = psfimg
+
         return psf_cutouts
 
     def combine_bands(self):
@@ -289,6 +292,7 @@ class CutoutProducer:
         """
         original_min = np.min(arr, axis=(-1, -2))
         shifted_max = np.max(arr - original_min[:,:,np.newaxis,np.newaxis], axis=(-1, -2))
+
         int_arr = np.rint(
             (arr - original_min[:,:,np.newaxis,np.newaxis]) / 
             shifted_max[:,:,np.newaxis,np.newaxis] * 65535).astype(np.uint16) 
