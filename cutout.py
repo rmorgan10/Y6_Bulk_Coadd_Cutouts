@@ -354,9 +354,9 @@ if __name__ == "__main__":
     assert len(sys.argv) == 2, "Tilename must be given as a a command-line argument"
     tilename = sys.argv[1]
     CUTOUT_SIZE = 45
-    PSF_CUTOUT_SIZE = 45
+    PSF_CUTOUT_SIZE = 25
     BANDS = "griz"
-    OUTDIR = "" # fill in once a path has been decided
+    OUTDIR = "/data/des81.b/data/stronglens/Y6_CUTOUT_IMAGES/"
 
     # Make a CutoutProducer for the tile
     cutout_prod = CutoutProducer(tilename, CUTOUT_SIZE, PSF_CUTOUT_SIZE, bands=BANDS)
