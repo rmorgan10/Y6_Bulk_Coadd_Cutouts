@@ -178,9 +178,10 @@ class CutoutProducer:
         object_x, object_y = self.get_object_xy(wcs)
 
         # Shout if any object is outside of tile
-        if not np.all((0 < object_x) & (object_x < image.shape[0])
-                    & (0 < object_y) & (object_y < image.shape[1])):
+        if not np.all((0 < object_x) & (object_x < image.shape[1])
+                      & (0 < object_y) & (object_y < image.shape[0])):
             raise ValueError('Some objects centered out of tile')
+
 
         # FIXME: If an object is too close to a tile edge, single_cutout will
         # return a misshapen cutout, and this will throw an error
@@ -205,10 +206,10 @@ class CutoutProducer:
         if width > min(image.shape):
             raise ValueError('Requested cutout is larger than image size')
         if (width % 2) == 0:
-            return image[x - width//2: x + width//2,
-                         y - width//2: y + width//2]
-        return image[x - width//2: x + width//2 + 1,
-                     y - width//2: y + width//2 + 1]
+            return image[y - width//2: y + width//2,
+                         x - width//2: x + width//2]
+        return image[y - width//2: y + width//2 + 1,
+                     x - width//2: x + width//2 + 1]
 
     def read_psf(self, band):
         """
@@ -289,6 +290,15 @@ class CutoutProducer:
         """
         original_min = np.min(arr, axis=(-1, -2))
         shifted_max = np.max(arr - original_min[:,:,np.newaxis,np.newaxis], axis=(-1, -2))
+
+        #test for zeros
+        for i in range(len(arr)):
+            for j in range(len(arr[0])):
+                #if shifted_max[i, j] != 0:
+                #    print(i, j)
+                if arr[i,j].max() == arr[i,j].min():
+                    print(i, j, arr[i,j].max())
+
         int_arr = np.rint(
             (arr - original_min[:,:,np.newaxis,np.newaxis]) / 
             shifted_max[:,:,np.newaxis,np.newaxis] * 65535).astype(np.uint16) 
