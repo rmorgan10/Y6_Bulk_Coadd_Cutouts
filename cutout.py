@@ -322,8 +322,8 @@ class CutoutProducer:
         # Make the COADD_ID HDU
         if not hasattr(self, "coadd_ids"):
             self.get_coadd_ids()
-        col = fits.Column(name='COADD_OBJECT_ID', array=self.coadd_ids, format='J')
-        coadd_ids = fits.BinTableHDU.from_columns([col], name="CUTOUT_ID")
+        col = fits.Column(name='ID', array=self.coadd_ids, format='J')
+        coadd_ids = fits.BinTableHDU.from_columns([col], name="ID")
 
         # Make the IMAGE HDU
         image = fits.ImageHDU(image_array, name="IMAGE")
