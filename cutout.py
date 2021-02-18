@@ -319,12 +319,6 @@ class CutoutProducer:
         # Make an empty PRIMARY HDU
         primary = fits.PrimaryHDU()
 
-        # Make the COADD_ID HDU
-        if not hasattr(self, "coadd_ids"):
-            self.get_coadd_ids()
-        col = fits.Column(name='ID', array=self.coadd_ids, format='J')
-        coadd_ids = fits.BinTableHDU.from_columns([col], name="ID")
-
         # Make the IMAGE HDU
         image = fits.ImageHDU(image_array, name="IMAGE")
 
@@ -334,16 +328,22 @@ class CutoutProducer:
             header_dict[f'PSFSAMP{b}'] = eval(f"self.psf_samp_{b}")
         psf = fits.ImageHDU(psf_array, name="PSF", header=fits.Header(header_dict))
 
-        # Make the img_min and img_scale HDUs
-        img_min = fits.ImageHDU(img_min, name="IMG_MIN")
-        img_scale = fits.ImageHDU(img_scale, name="IMG_SCALE")
-
-        # Make the psf_min and psf_scale HDUs
-        psf_min = fits.ImageHDU(psf_min, name="PSF_MIN")
-        psf_scale = fits.ImageHDU(psf_scale, name="PSF_SCALE")
+        # Make the INFO HDU
+        if not hasattr(self, "coadd_ids"):
+            self.get_coadd_ids()
+        data_info = {'ID':        {'NAME': 'self.coadd_ids', 'DTYPE': 'S14'},
+                     'IMG_MIN':   {'NAME': 'img_min',        'DTYPE': (float, len(self.bands))},
+                     'IMG_SCALE': {'NAME': 'img_scale',      'DTYPE': (float, len(self.bands))},
+                     'PSF_MIN':   {'NAME': 'psf_min',        'DTYPE': (float, len(self.bands))},
+                     'PSF_SCALE': {'NAME': 'psf_scale',      'DTYPE': (float, len(self.bands))}}
+        dtypes = [(name, info['DTYPE']) for name, info in data_info.items()]
+        table = np.zeros(len(self.coadd_ids), dtype=dtypes)
+        for name, info in data_info.items():
+            table[name] = eval(info['NAME'])
+        info = fits.BinTableHDU(data=table, name='INFO')
 
         # Write the file
-        hdu_list = fits.HDUList([primary, coadd_ids, image, psf, img_min, img_scale, psf_min, psf_scale])
+        hdu_list = fits.HDUList([primary, image, psf, info])
         if not out_dir.endswith('/') and out_dir != '':
             out_dir += '/'
         hdu_list.writeto(f'{out_dir}{self.tilename}.fits', overwrite=True)

@@ -187,26 +187,23 @@ class TestCutoutProducer(unittest.TestCase):
 
         # Verify existence of data products
         hdu = fits.open(outfile_name)
-        self.assertEqual(len(hdu), 8)
-
-        # check coadd ids
-        self.assertEqual(len(hdu[1].data), len(self.cutout_producer.coadd_ids))
-        np.testing.assert_array_equal(hdu[1].data.astype(int), self.cutout_producer.coadd_ids)
+        self.assertEqual(len(hdu), 4)
 
         # check image array
-        np.testing.assert_array_equal(np.shape(hdu[2].data), np.shape(image_array))
-        np.testing.assert_allclose(hdu[2].data, image_array)
+        np.testing.assert_array_equal(np.shape(hdu['IMAGE'].data), np.shape(image_array))
+        np.testing.assert_allclose(hdu['IMAGE'].data, image_array)
 
         # check psf array
-        np.testing.assert_array_equal(np.shape(hdu[3].data), np.shape(psf_array))
-        np.testing.assert_allclose(hdu[3].data, psf_array)
-        self.assertEqual(hdu[3].header['PSFSAMPg'], self.cutout_producer.psf_samp_g)
+        np.testing.assert_array_equal(np.shape(hdu['PSF'].data), np.shape(psf_array))
+        np.testing.assert_allclose(hdu['PSF'].data, psf_array)
+        self.assertEqual(hdu['PSF'].header['PSFSAMPg'], self.cutout_producer.psf_samp_g)
 
-        # check recovery arrays
-        np.testing.assert_allclose(hdu[4].data, img_min)
-        np.testing.assert_allclose(hdu[5].data, img_scale)
-        np.testing.assert_allclose(hdu[6].data, psf_min)
-        np.testing.assert_allclose(hdu[7].data, psf_scale)
+        # check info array
+        np.testing.assert_array_equal(hdu['INFO'].data['ID'], self.cutout_producer.coadd_ids.astype(str))  # Coadd IDs
+        np.testing.assert_allclose(hdu['INFO'].data['IMG_MIN'], img_min)      
+        np.testing.assert_allclose(hdu['INFO'].data['IMG_SCALE'], img_scale)
+        np.testing.assert_allclose(hdu['INFO'].data['PSF_MIN'], psf_min)
+        np.testing.assert_allclose(hdu['INFO'].data['PSF_SCALE'], psf_scale)
 
         hdu.close()
 
