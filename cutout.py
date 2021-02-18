@@ -15,6 +15,7 @@ import sys
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.wcs import WCS
+import fitsio
 import numpy as np
 import pandas as pd
 
@@ -152,6 +153,36 @@ class CutoutProducer:
 
         self.coadd_ids = np.array(self.metadata['COADD_OBJECT_ID'].values, dtype=int)
         return
+
+    def get_tile_wcs(self):
+        """
+        Read the wcs information from the file header. This method is not used to
+        obtain the wcs that other functions in this class use. This information 
+        is written directly to the output fits file so that the original WCS info
+        is a part of the final cutous.
+
+        :return: wcs_table: table of wcs info to be written to output file
+        """
+        DTYPE = [ (f"CTYPE{i}",'S8') for i in [1,2]] +\
+                [ (f"DCRPIX{i}",float) for i in [1,2]] + \
+                [ (f"CRPIX{i}", float) for i in [1,2]]  + \
+                [ (f"CRVAL{i}", float) for i in [1,2]]  + \
+                [ (f"CD{j}_{i}",float) for i in [1,2] for j in [1,2]]   + \
+                [ (f"PV{j}_{i}",float) for i in range(11) for j in [1,2]]
+        DTYPES = [ (n, (d, len(self.bands))) for n, d in DTYPE]
+
+        wcs_table = np.zeros(1, dtype=DTYPES)
+        wcs_table.fill(np.nan)
+        for idx, band in enumerate(self.bands):
+            tile_filename = self.get_tile_filename(band)
+            hdr = fitsio.read_header(tile_filename, ext='SCI')
+            for name, dt in DTYPE:
+                try:
+                    wcs_table[name][:,idx] = hdr[name]
+                except KeyError:
+                    pass
+
+        return wcs_table
 
     def get_object_xy(self, wcs):
         """
@@ -342,8 +373,11 @@ class CutoutProducer:
             table[name] = eval(info['NAME'])
         info = fits.BinTableHDU(data=table, name='INFO')
 
+        # Make the WCS HDU
+        wcs = fits.BinTableHDU(data=self.get_tile_wcs(), name='WCS')
+
         # Write the file
-        hdu_list = fits.HDUList([primary, image, psf, info])
+        hdu_list = fits.HDUList([primary, image, psf, info, wcs])
         if not out_dir.endswith('/') and out_dir != '':
             out_dir += '/'
         hdu_list.writeto(f'{out_dir}{self.tilename}.fits', overwrite=True)
