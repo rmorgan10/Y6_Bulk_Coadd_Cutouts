@@ -167,8 +167,8 @@ class CutoutProducer:
                 [ (f"DCRPIX{i}",float) for i in [1,2]] + \
                 [ (f"CRPIX{i}", float) for i in [1,2]]  + \
                 [ (f"CRVAL{i}", float) for i in [1,2]]  + \
-                [ (f"CD{j}_{i}",float) for i in [1,2] for j in [1,2]]   + \
-                [ (f"PV{j}_{i}",float) for i in range(11) for j in [1,2]]
+                [ (f"CD{j}_{i}",float) for i in [1,2] for j in [1,2]] #  + \
+                #[ (f"PV{j}_{i}",float) for i in range(11) for j in [1,2]]
         DTYPES = [ (n, (d, len(self.bands))) for n, d in DTYPE]
 
         wcs_table = np.zeros(1, dtype=DTYPES)
@@ -390,7 +390,8 @@ if __name__ == "__main__":
     CUTOUT_SIZE = 45
     PSF_CUTOUT_SIZE = 25
     BANDS = "griz"
-    OUTDIR = "/data/des81.b/data/stronglens/Y6_CUTOUT_IMAGES/"
+    #OUTDIR = "/data/des81.b/data/stronglens/Y6_CUTOUT_IMAGES/"
+    OUTDIR = "/data/des81.b/data/stronglens/PRODUCTION/Y6_CUTOUT_IMAGES/full_tile_test/"
 
     # Make a CutoutProducer for the tile
     cutout_prod = CutoutProducer(tilename, CUTOUT_SIZE, PSF_CUTOUT_SIZE, bands=BANDS)
