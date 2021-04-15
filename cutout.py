@@ -18,9 +18,6 @@ from astropy.wcs import WCS
 import numpy as np
 import pandas as pd
 
-import galsim
-from galsim.des.des_psfex import DES_PSFEx
-
 
 class CutoutProducer:
     """
@@ -40,28 +37,23 @@ class CutoutProducer:
 
     """
 
-    def __init__(self, tilename, cutout_size, psf_cutout_size, bands="griz",
+    def __init__(self, tilename, cutout_size, bands="griz",
                  metadata_path='/data/des81.b/data/stronglens/Y6_CUTOUT_METADATA/',
-                 coadds_path='/data/des40.b/data/des/y6a2/coadd/image/',
-                 psf_path='/data/des40.b/data/des/y6a2/coadd/image/'):
+                 coadds_path='/data/des40.b/data/des/y6a2/coadd/image/'):
 
         """
         Initialize a CutoutProducer.
 
         :param tilename: (str) name of DES tile; something like 'DES0536-5457'
         :param cutout_size: (int) side length in pixels of desired cutouts
-        :param psf_cutout_size: (int) side length in pixels of desired PSF cutouts
         :param bands: (str) bands to include; something like "griz" or "grizY"
         :param coadds_path: (str) path relative to the COADD images (organized as tiles)
-        :param psf_path: (str) path relative to the PSF files (organized as tiles)
         """
         self.metadata_path = metadata_path
         self.coadds_path = coadds_path 
-        self.psf_path = psf_path
-        self.metadata_suffix = ".tab.gz"
+        self.metadata_suffix = ""
         self.tilename = tilename
         self.cutout_size = cutout_size
-        self.psf_cutout_size = psf_cutout_size
         self.bands = bands
         return
 
@@ -86,25 +78,6 @@ class CutoutProducer:
 
         guess = os.path.join(self.coadds_path, self.tilename,
                              f'{self.tilename}_r*_{band}.fits.fz')
-
-        matches = glob.glob(guess)
-
-        if len(matches) > 1:
-            return ValueError('error - more than one possible coadd')
-        elif not matches:
-            raise ValueError('no images found')
-
-        return matches[0]
-
-    def get_tile_psf_filename(self, band):
-        """
-        construct the filepath to the coadd tile PSF model
-
-        :param band: (str) one of ('g', 'r', 'i', 'z', 'Y')
-        :return: path: (str) absolute path to tile
-        """
-        guess = os.path.join(self.coadds_path, self.tilename,
-                             f'{self.tilename}_r*_{band}_psfcat.psf')
 
         matches = glob.glob(guess)
 
@@ -212,39 +185,6 @@ class CutoutProducer:
         return image[y - width//2: y + width//2 + 1,
                      x - width//2: x + width//2 + 1]
 
-    def read_psf(self, band):
-        """
-        Read a psf into memory
-
-        :param band: (str) band to target
-        :return: a DES_PSFEx instance
-        """
-        filename = self.get_tile_psf_filename(band)
-        psf = DES_PSFEx(filename)
-        setattr(self, f"psf_samp_{band}", psf.getSampleScale())
-        return psf
-    
-    def cutout_psfs(self, psf, wcs):
-        """
-        Grab square PSF cutout images
-
-        :param psf: a DES_PSFEx instance 
-        :param wcs: (astropy.WCS) the wcs for the tile
-
-        :return: 3D Numpy array
-        """
-        object_x, object_y = self.get_object_xy(wcs)
-        
-        psf_cutouts = np.empty((len(self.coadd_ids), self.psf_cutout_size, self.psf_cutout_size), dtype=np.double)
-
-        for i, (x, y) in enumerate(zip(object_x, object_y)):
-            pos = galsim.PositionI(x,y) 
-            psfimg = psf.getPSFArray(pos)
-            center = (psfimg.shape[0] // 2, psfimg.shape[1] // 2)
-            psfimg = self.single_cutout(psfimg, center, self.psf_cutout_size)
-            psf_cutouts[i] = psfimg
-
-        return psf_cutouts
 
     def combine_bands(self):
         """
@@ -262,20 +202,14 @@ class CutoutProducer:
         for i, band in enumerate(self.bands):
             # Open image file
             image, wcs = self.read_tile_image(band)
-            psf = self.read_psf(band)
 
             # Cutout images
             image_cutouts = self.cutout_objects(image, wcs)
             image_array[i] = image_cutouts
 
-            # Cutout psfs
-            psf_cutouts = self.cutout_psfs(psf, wcs)
-            psf_array[i] = psf_cutouts
-            
         image_array = np.swapaxes(image_array, 0, 1)
-        psf_array = np.swapaxes(psf_array, 0, 1)
 
-        return image_array, psf_array
+        return image_array
 
     @staticmethod
     def scale_array_to_ints(arr):
@@ -300,21 +234,18 @@ class CutoutProducer:
         return int_arr, original_min, shifted_max
 
 
-    def produce_cutout_file(self, image_array, psf_array, out_dir=''):
+    def produce_cutout_file(self, image_array, out_dir=''):
         """
         Organize cutout data into an output file
 
         :param image_array: (np.array) contains all images. Has
                             shape = (len(coadd_ids), num_bands, cutout_size, cutout_size)
-        :param psf_array: (np.array) contains all psfs. Has
-                            shape = (len(coadd_ids), num_bands, psf_size, psf_size) 
         :param out_dir: (str) path to out directory
            - leave as default '' for current directory
 
         """
         # Scale the image and psf arrays
         image_array, img_min, img_scale = self.scale_array_to_ints(image_array)
-        psf_array, psf_min, psf_scale = self.scale_array_to_ints(psf_array)
 
         # Make an empty PRIMARY HDU
         primary = fits.PrimaryHDU()
@@ -328,22 +259,12 @@ class CutoutProducer:
         # Make the IMAGE HDU
         image = fits.ImageHDU(image_array, name="IMAGE")
 
-        # Make the PSF HDU
-        header_dict = {}
-        for b in self.bands:
-            header_dict[f'PSFSAMP{b}'] = eval(f"self.psf_samp_{b}")
-        psf = fits.ImageHDU(psf_array, name="PSF", header=fits.Header(header_dict))
-
         # Make the img_min and img_scale HDUs
         img_min = fits.ImageHDU(img_min, name="IMG_MIN")
         img_scale = fits.ImageHDU(img_scale, name="IMG_SCALE")
 
-        # Make the psf_min and psf_scale HDUs
-        psf_min = fits.ImageHDU(psf_min, name="PSF_MIN")
-        psf_scale = fits.ImageHDU(psf_scale, name="PSF_SCALE")
-
         # Write the file
-        hdu_list = fits.HDUList([primary, coadd_ids, image, psf, img_min, img_scale, psf_min, psf_scale])
+        hdu_list = fits.HDUList([primary, coadd_ids, image, img_min, img_scale])
         if not out_dir.endswith('/') and out_dir != '':
             out_dir += '/'
         hdu_list.writeto(f'{out_dir}{self.tilename}.fits', overwrite=True)
@@ -354,23 +275,20 @@ if __name__ == "__main__":
     assert len(sys.argv) == 2, "Tilename must be given as a a command-line argument"
     tilename = sys.argv[1]
     CUTOUT_SIZE = 45
-    PSF_CUTOUT_SIZE = 25
     BANDS = "griz"
     OUTDIR = "/data/des81.b/data/stronglens/Y6_CUTOUT_IMAGES/"
 
     # Make a CutoutProducer for the tile
-    cutout_prod = CutoutProducer(tilename, CUTOUT_SIZE, PSF_CUTOUT_SIZE, bands=BANDS)
+    cutout_prod = CutoutProducer(tilename, CUTOUT_SIZE, bands=BANDS)
 
     # Quit if missing files
     for band in cutout_prod.bands:
         tile_path = cutout_prod.get_tile_filename(band)
         assert os.path.exists(tile_path), "Coadd image should exist"
-        psf_path = cutout_prod.get_tile_psf_filename(band)
-        assert os.path.exists(psf_path), "PSF file should exist"
         
     # Produce the cutouts
     cutout_prod.read_metadata()
-    image_array, psf_array = cutout_prod.combine_bands()
-    cutout_prod.produce_cutout_file(image_array, psf_array, out_dir=OUTDIR)
+    image_array = cutout_prod.combine_bands()
+    cutout_prod.produce_cutout_file(image_array, out_dir=OUTDIR)
 
 
