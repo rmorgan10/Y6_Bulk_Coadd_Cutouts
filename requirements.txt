@@ -1,4 +1,3 @@
-galsim
 astropy
 numpy
 pandas
