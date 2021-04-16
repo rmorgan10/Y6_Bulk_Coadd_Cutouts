@@ -8,6 +8,11 @@
 #   - Erik Zaborowski (ezaborowski@uchicago.edu)
 #   - Simon Birrer (sibirrer@gmail.com)
 
+"""
+Single-epoch deep-field cutout production
+"""
+
+import argparse
 import glob
 import os
 from pathlib import Path
@@ -38,7 +43,7 @@ class CutoutProducer:
 
     """
 
-    def __init__(self, field, ccd, season, cutout_size, outdir, test=False,
+    def __init__(self, field, ccd, season, cutout_size, outdir, test=False, maglim=90,
                  image_path = '/afs/hep.wisc.edu/home/ramorgan2/DeepTransientSims/Data/',
                  metadata_path = '/afs/hep.wisc.edu/home/ramorgan2/DeepTransientSims/Data/',
                  catalog_path = '/afs/hep.wisc.edu/home/ramorgan2/DeepTransientSims/Data/'):
@@ -52,11 +57,13 @@ class CutoutProducer:
         self.catalog_path = catalog_path 
         self.metadata_suffix = ""
         self.test = test
+        self.maglim = maglim
         self.field = field
         self.ccd = ccd
         self.season = season
         self.cutout_size = cutout_size
         self.outdir = outdir
+        self.pad = 2 * self.cutout_size
 
 
     def read_metadata(self):
@@ -113,15 +120,20 @@ class CutoutProducer:
         # Trim to relevant catalog
         df = pd.read_csv(filename)
         self.catalog = df[(df['CCD'].values == self.ccd) &
-                          (df['FIELD'].values == 'SN-' + self.field.upper())
-                          ].copy().reset_index(drop=True)
+                          (df['FIELD'].values == 'SN-' + self.field.upper()) &
+                          (df['MAG_AUTO_I'].values < self.maglim)
+                        ].copy().reset_index(drop=True)
         del df
         if len(self.catalog) == 0:
             raise ValueError(f"CCD {self.ccd} and FIELD {self.field} produced an empty catalog")
 
+        # set fill flags
+        self.fill_flags = np.zeros(len(self.catalog), dtype=bool)
+
         # trim if testing
         if self.test:
-            self.catalog = self.catalog.sample(5)
+            self.catalog = self.catalog.sample(25, random_state=3)
+            self.fill_flags = self.fill_flags[0:25]
 
 
     def read_image(self, filename):
@@ -134,6 +146,10 @@ class CutoutProducer:
         """
         f = fits.open(filename, mode='readonly')
         image = f["SCI"].data
+
+        # pad image with min value
+        image = np.pad(image, self.pad, mode='minimum')
+
         wcs = WCS(f["SCI"].header)
         f.close()
         return image, wcs
@@ -172,7 +188,9 @@ class CutoutProducer:
         # Get pixel of each location, rounding
         pixel_x, pixel_y = wcs.world_to_pixel(SkyCoord(ras, decs, unit='deg'))
         object_x, object_y = pixel_x.round().astype(int), pixel_y.round().astype(int)
-        return object_x, object_y
+        
+        # add padding
+        return object_x + self.pad, object_y + self.pad
 
     def cutout_objects(self, image, wcs):
         """
@@ -184,18 +202,23 @@ class CutoutProducer:
         # Get index locations of all objects
         object_x, object_y = self.get_object_xy(wcs)
 
-        # Shout if any object is outside of tile
-        if not np.all((0 < object_x) & (object_x < image.shape[1])
-                      & (0 < object_y) & (object_y < image.shape[0])):
-            raise ValueError('Some objects centered out of tile')
+        # Shout if any object is outside more than half a cutout_size outside the image
+        if not np.all((1 - self.cutout_size //2 < object_x) & 
+                      (object_x < image.shape[1] + self.cutout_size //2 - 1) &
+                      (1 - self.cutout_size //2 < object_y) &
+                      (object_y < image.shape[0] + self.cutout_size //2 - 1)):
+
+            raise ValueError('Some objects centered out of CCD')
 
 
-        # FIXME: If an object is too close to a tile edge, single_cutout will
-        # return a misshapen cutout, and this will throw an error
+        # Flag objects on edges of CCD
+        self.get_fill_flags(object_x, object_y)
+
+        # Make cutouts
         cutouts = np.empty((len(self.coadd_ids), self.cutout_size, self.cutout_size), dtype=np.double)
         for i, (x, y) in enumerate(zip(object_x, object_y)):
             cutouts[i] = self.single_cutout(image, (x, y), self.cutout_size)
-
+            
         return cutouts
 
     def single_cutout(self, image, center, width=None):
@@ -216,8 +239,9 @@ class CutoutProducer:
         if (width % 2) == 0:
             return image[y - width//2: y + width//2,
                          x - width//2: x + width//2]
-        return image[y - width//2: y + width//2 + 1,
-                     x - width//2: x + width//2 + 1]
+        else:
+            return image[y - width//2: y + width//2 + 1,
+                         x - width//2: x + width//2 + 1]
 
 
     def combine_bands(self, g_filename, r_filename, i_filename, z_filename):
@@ -269,6 +293,19 @@ class CutoutProducer:
     def format_filename(self, base_filename):
         return f"{self.image_path}{self.season}/{base_filename}.fz"
 
+    def get_fill_flags(self, object_x, object_y):
+        
+        object_x_ = object_x - self.pad
+        object_y_ = object_y - self.pad
+
+        fill_flags = ~((object_x_ - self.cutout_size //2 > 0) & 
+                       (object_x_ + self.cutout_size //2 < 2048) & 
+                       (object_y_ - self.cutout_size //2 > 0) & 
+                       (object_y_ + self.cutout_size //2 < 4096))
+
+        self.fill_flags = self.fill_flags | fill_flags
+
+
     def cutout_all_epochs(self):
         """
         loop through epochs and stack cutouts, track and organize metadata
@@ -283,6 +320,8 @@ class CutoutProducer:
             i_filename = self.format_filename(self.metadata[nite]['i']['FILENAME'])
             z_filename = self.format_filename(self.metadata[nite]['z']['FILENAME'])
 
+            print(r_filename)
+
             # Cutout objects
             image_array = self.combine_bands(g_filename, r_filename, i_filename, z_filename)
 
@@ -295,6 +334,8 @@ class CutoutProducer:
                             'IMG_SCALE': img_scale,
                             'METADATA': self.metadata[nite]}
 
+        self.catalog['FILL_FLAG'] = self.fill_flags.astype(int)
+        output['MAGLIM'] = self.maglim
         output['CATALOG'] = self.catalog
         output['NITES'] = self.nites
         return output
@@ -308,16 +349,44 @@ class CutoutProducer:
 
 
 if __name__ == "__main__":
-    #assert len(sys.argv) == 2, "Tilename must be given as a a command-line argument"
-    #tilename = sys.argv[1]
-    CUTOUT_SIZE = 45
-    field = 'X1'
-    ccd = 33
-    season = 'Y1'
-    #OUTDIR = "/data/des81.b/data/stronglens/Y6_CUTOUT_IMAGES/"
+
+
+    parser = argparse.ArgumentParser(description=__doc__)
+
+    parser.add_argument('--field',
+                        type=str,
+                        help='Like X1, X3, C3, etc.',
+                        required=True)
+    parser.add_argument('--ccd',
+                        type=int,
+                        help='CCD number as integer',
+                        required=True)
+    parser.add_argument('--season',
+                        type=str,
+                        help='Like SV, Y1, Y2, etc.',
+                        required=True)
+    parser.add_argument('--outdir',
+                        type=str,
+                        help='Directory for results',
+                        default='')
+    parser.add_argument('--size',
+                        type=int,
+                        help='Side length (in px) of cutouts',
+                        default=45)
+    parser.add_argument('--test',
+                        action='store_true',
+                        help='Run on only 5 objects and 2 nites')
+    parser.add_argument('--maglim',
+                        type=float,
+                        help='Faintest i-magnitude to include',
+                        default=90)
+    
+    args = parser.parse_args()
 
     # Make a CutoutProducer for the tile
-    cutout_prod = CutoutProducer(field, ccd, season, CUTOUT_SIZE, outdir="", test=True)
+    cutout_prod = CutoutProducer(
+        args.field, args.ccd, args.season, args.size, args.outdir, test=args.test,
+        maglim = args.maglim)
 
     # Check that we can save the output at the end
     outfile_name = cutout_prod.get_outfile_name()
