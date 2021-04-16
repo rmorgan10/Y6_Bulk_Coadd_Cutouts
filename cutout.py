@@ -320,8 +320,6 @@ class CutoutProducer:
             i_filename = self.format_filename(self.metadata[nite]['i']['FILENAME'])
             z_filename = self.format_filename(self.metadata[nite]['z']['FILENAME'])
 
-            print(r_filename)
-
             # Cutout objects
             image_array = self.combine_bands(g_filename, r_filename, i_filename, z_filename)
 
