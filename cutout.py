@@ -44,9 +44,9 @@ class CutoutProducer:
     """
 
     def __init__(self, field, ccd, season, cutout_size, outdir, test=False, maglim=90,
-                 image_path = '/afs/hep.wisc.edu/home/ramorgan2/DeepTransientSims/Data/',
-                 metadata_path = '/afs/hep.wisc.edu/home/ramorgan2/DeepTransientSims/Data/',
-                 catalog_path = '/afs/hep.wisc.edu/home/ramorgan2/DeepTransientSims/Data/'):
+                 image_path = '/data/des81.b/data/stronglens/DEEP_FIELDS/PRODUCTION/images/',
+                 metadata_path = '/data/des81.b/data/stronglens/DEEP_FIELDS/PRODUCTION/metadata/',
+                 catalog_path = '/data/des81.b/data/stronglens/DEEP_FIELDS/PRODUCTION/catalog/'):
 
         """
         Initialize a CutoutProducer.
@@ -63,19 +63,19 @@ class CutoutProducer:
         self.season = season
         self.cutout_size = cutout_size
         self.outdir = outdir
-        self.pad = 2 * self.cutout_size
+        self.pad = 3 * self.cutout_size
 
 
     def read_metadata(self):
         """
         Read the metadata for the observations into a Pandas DataFrame
         """
-        filename = self.metadata_path + self.field.lower() + "_metadata_seasons.tab" + self.metadata_suffix
+        filename = self.metadata_path + self.field.upper() + "_metadata.csv" + self.metadata_suffix
         if not os.path.exists(filename):
             raise IOError(f"{filename} not found")
             
         # Trim to relevant metadata
-        df = pd.read_csv(filename, delim_whitespace=True)
+        df = pd.read_csv(filename)
         df['CCD'] = df['FILENAME'].str.extract("_c(.*?)_").values.astype(int)
         df = df[(df['SEASON'].values == self.season.upper()) &
                 (df['CCD'].values == self.ccd)
@@ -84,16 +84,16 @@ class CutoutProducer:
         if len(df) == 0:
             raise ValueError(f"SEASON {self.season} and CCD {self.ccd} produced empty metadata")
 
-        # Drop nites that don't have all of griz, select best psf if two images exist
+        # Select best psf if two images exist
         self.metadata = {}
         nite_groups = df.groupby('NITE')
         for (nite, md) in nite_groups:
-            flt_groups = md.groupby('FILTER')
+            flt_groups = md.groupby('FLT')
             mds_ = {}
             for (flt, md_) in flt_groups:
                 mds_[flt] = md_.iloc[np.argmin(md_['FWHM'].values)]
-            if len(mds_) == 4:
-                self.metadata[nite] = mds_
+
+            self.metadata[nite] = mds_
 
 
         del df
@@ -218,7 +218,7 @@ class CutoutProducer:
         cutouts = np.empty((len(self.coadd_ids), self.cutout_size, self.cutout_size), dtype=np.double)
         for i, (x, y) in enumerate(zip(object_x, object_y)):
             cutouts[i] = self.single_cutout(image, (x, y), self.cutout_size)
-            
+
         return cutouts
 
     def single_cutout(self, image, center, width=None):
@@ -255,14 +255,25 @@ class CutoutProducer:
             self.get_coadd_ids()
 
         image_array = np.empty((4, len(self.coadd_ids), self.cutout_size, self.cutout_size), dtype=np.double)
-        
+
+        # Cutout objects and track bands missing on a given nite
+        missing_idx = []
         for i, filename in enumerate([g_filename, r_filename, i_filename, z_filename]):
+            if filename == 'flag':
+                missing_idx.append(i)
+                continue
+                
             # Open image file
             image, wcs = self.read_image(filename)
 
             # Cutout images
             image_cutouts = self.cutout_objects(image, wcs)
             image_array[i] = image_cutouts
+
+        # If any missing bands on a nite are detected, fill with the median value
+        fill_val = np.median(image_array)
+        for idx in missing_idx:
+            image_array[idx] = fill_val
 
         image_array = np.swapaxes(image_array, 0, 1)
 
@@ -283,6 +294,8 @@ class CutoutProducer:
         """
         original_min = np.min(arr, axis=(-1, -2))
         shifted_max = np.max(arr - original_min[:,:,np.newaxis,np.newaxis], axis=(-1, -2))
+        shifted_max = np.where(shifted_max == 0, 1.0, shifted_max)
+
 
         int_arr = np.rint(
             (arr - original_min[:,:,np.newaxis,np.newaxis]) / 
@@ -315,13 +328,13 @@ class CutoutProducer:
         output = {}
         for nite in self.nites:
             # Get filenames from metadata
-            g_filename = self.format_filename(self.metadata[nite]['g']['FILENAME'])
-            r_filename = self.format_filename(self.metadata[nite]['r']['FILENAME'])
-            i_filename = self.format_filename(self.metadata[nite]['i']['FILENAME'])
-            z_filename = self.format_filename(self.metadata[nite]['z']['FILENAME'])
+            filenames = {'g': 'flag', 'r': 'flag', 'i': 'flag', 'z': 'flag'}
+            for flt in "griz":
+                if flt in self.metadata[nite]:
+                    filenames[flt] = self.format_filename(self.metadata[nite][flt]['FILENAME'])
 
             # Cutout objects
-            image_array = self.combine_bands(g_filename, r_filename, i_filename, z_filename)
+            image_array = self.combine_bands(filenames['g'], filenames['r'], filenames['i'], filenames['z'])
 
             # Scale array
             image_array, img_min, img_scale = self.scale_array_to_ints(image_array)
