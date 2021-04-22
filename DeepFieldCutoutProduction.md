@@ -81,6 +81,8 @@ Run the script `make_wget_lists.py`
 
 Only download one field and season at a time to conserve disk space. 
 The download script will not run if it detects existing images.
+The easiest way to clear out existing images is to issue the command `rm -rf images`, since the `images/` directory will be remade automatically.
+
 Below is an example for Y1 X3 images. 
 The credentials are your easyaccess credentials and you will be prompted for your password.
 
