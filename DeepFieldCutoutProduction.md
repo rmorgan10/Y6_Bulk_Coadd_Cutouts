@@ -68,7 +68,8 @@ select SUBSTR(e.filter, 1, 1) as FLT, e.mjd_obs, i.skybrite, e.exptime, i.fwhm, 
 
 ### Correct SEASON values
 
-Easyaccess seems to have a bug where string values set in a `case` statement can be displayed interactively but do not get written to a file. To account for this bug, the queries save the SEASON as integers and we edit the results with python
+Easyaccess seems to have a bug where string values set in a `case` statement can be displayed interactively but do not get written to a file [Issue 181](https://github.com/mgckind/easyaccess/issues/181). 
+To account for this bug, the queries save the SEASON as integers and we edit the results with python
 
 After querying, run `fix_metadata_seasons.py`
 
@@ -76,17 +77,21 @@ After querying, run `fix_metadata_seasons.py`
 
 Run the script `make_wget_lists.py`
 
-### Make `images` directory
-
-`cp -r wget_lists images`
-
 ### Download files
 
-Only download one field and season at a time to conserve disk space. Below is an example for Y1 X3 images. The credentials are your easyaccess credentials.
+Only download one field and season at a time to conserve disk space. 
+The download script will not run if it detects existing images.
+Below is an example for Y1 X3 images. 
+The credentials are your easyaccess credentials and you will be prompted for your password.
 
 ```
-cd images/Y1
-wget --no-check-certificate --http-user=<username> --http-password=<password> -i X3_wgetlist.txt
+python download_images.py --field X3 --season Y1 --username <username>
+```
+
+To check progress while the download is running, you can use the same command, but append `--check_progress` to it.
+
+```
+python download_images.py --field X3 --season Y1 --username <username> --check_progress
 ```
 
 ### Make the catalog
